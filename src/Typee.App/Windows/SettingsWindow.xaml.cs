@@ -5,9 +5,7 @@ using Typee.App.ViewModels;
 namespace Typee.App.Windows;
 
 /// <summary>
-/// Callers: TrayIconHost.ShowSettings. Companion to SettingsWindow.xaml (already created).
-/// No prior code-behind existed. Hotkey capture UI only; settings persist via ViewModel/ISettingsStore.
-/// User instruction: "Settings window (simple WPF form) that edits and saves settings.json, including a hotkey capture box."
+/// Callers: TrayIconHost.ShowSettings. Hotkey capture UI only; settings persist via ViewModel/ISettingsStore.
 /// </summary>
 public partial class SettingsWindow : Window
 {
@@ -21,13 +19,22 @@ public partial class SettingsWindow : Window
         PreviewKeyDown += OnPreviewKeyDown;
     }
 
-    private void CaptureToggleWidget_OnClick(object sender, RoutedEventArgs e)
-        => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.ToggleWidgetHotkey));
+    private void CaptureCommandBar_OnClick(object sender, RoutedEventArgs e)
+        => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.CommandBarHotkey));
+
+    private void CaptureSendToLastAi_OnClick(object sender, RoutedEventArgs e)
+        => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.SendToLastAiHotkey));
+
+    private void CaptureListStylePicker_OnClick(object sender, RoutedEventArgs e)
+        => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.ListStylePickerHotkey));
+
+    private void CaptureToggleChecklist_OnClick(object sender, RoutedEventArgs e)
+        => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.ToggleChecklistHotkey));
 
     private void CapturePushToTalk_OnClick(object sender, RoutedEventArgs e)
         => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.PushToTalkHotkey));
 
-    private void CaptureAccept_OnClick(object sender, RoutedEventArgs e)
+    private void CaptureAcceptSuggestion_OnClick(object sender, RoutedEventArgs e)
         => _viewModel.BeginHotkeyCapture(nameof(SettingsWindowViewModel.AcceptSuggestionHotkey));
 
     private void CaptureDismiss_OnClick(object sender, RoutedEventArgs e)
@@ -40,14 +47,15 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        if (e.Key is Key.Escape)
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.Escape && Keyboard.Modifiers == ModifierKeys.None
+            && _viewModel.CapturingHotkeyTarget != nameof(SettingsWindowViewModel.DismissHotkey))
         {
             _viewModel.CancelHotkeyCapture();
             e.Handled = true;
             return;
         }
 
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
         {
             e.Handled = true;
@@ -85,6 +93,10 @@ public partial class SettingsWindow : Window
         return key switch
         {
             Key.Space => "Space",
+            Key.Return => "Enter",
+            Key.Escape => "Escape",
+            Key.Tab => "Tab",
+            Key.Back => "Backspace",
             Key.OemPeriod => ".",
             Key.OemComma => ",",
             Key.OemMinus => "-",

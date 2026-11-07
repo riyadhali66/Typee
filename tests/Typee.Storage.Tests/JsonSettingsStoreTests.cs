@@ -52,7 +52,7 @@ public sealed class JsonSettingsStoreTests
             var loaded = await store.LoadAsync();
 
             Assert.True(File.Exists(paths.SettingsFilePath));
-            Assert.Equal("Ctrl+Shift+Space", loaded.Hotkeys.ToggleWidget);
+            Assert.Equal("Ctrl+Shift+Space", loaded.Hotkeys.CommandBar);
             Assert.Equal("TYPEE_API_KEY", loaded.Llm.ApiKeyEnvVar);
         }
         finally

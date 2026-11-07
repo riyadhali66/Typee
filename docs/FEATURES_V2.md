@@ -6,7 +6,7 @@ Planned features beyond the master build prompt. **Nothing in this file is imple
 
 ## PHASE 8F — Translate preview · LLM profiles · Summarize selection
 
-Status: **planned — do not implement yet.**
+Status: **approved for implementation — build right after Phase 8C** (set to "in progress" when started, "done" when finished).
 Depends on: Phase 5 (SQLite storage + migrations), 7 (LLM client, consent screen), 8A (Action Menu, Translate), 8C (Command Bar, preview card, actions.json).
 
 ### 1. Translate — side-by-side preview before accepting

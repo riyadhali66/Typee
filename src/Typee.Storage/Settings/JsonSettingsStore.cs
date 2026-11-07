@@ -193,9 +193,17 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
         settings.Suggestions ??= new SuggestionSettings();
         settings.Grammar ??= new GrammarSettings();
         settings.Llm ??= new LlmSettings();
+        settings.Button ??= new ButtonSettings();
+        settings.SmartLists ??= new SmartListsSettings();
+        settings.PromptAssist ??= new PromptAssistSettings();
+        settings.Snippets ??= new SnippetsSettings();
         settings.Speech ??= new SpeechSettings();
+        settings.TranslateTargets ??= ["English", "Arabic"];
         settings.BlockedProcesses ??= AppSettings.DefaultBlockedProcesses();
         settings.Grammar.DisabledRules ??= [];
+        settings.SmartLists.DisabledProcesses ??= AppSettings.DefaultSmartListDisabledProcesses();
+        settings.PromptAssist.Targets ??= AppSettings.DefaultPromptAssistTargets();
+        settings.PromptAssist.DetectionThreshold = Math.Clamp(settings.PromptAssist.DetectionThreshold, 0.0, 1.0);
         settings.Suggestions.DebounceMs = Math.Clamp(settings.Suggestions.DebounceMs, 50, 10_000);
         settings.Suggestions.MinCharsBeforeSuggest = Math.Clamp(settings.Suggestions.MinCharsBeforeSuggest, 1, 10_000);
         settings.Suggestions.MaxContextChars = Math.Clamp(settings.Suggestions.MaxContextChars, 32, 20_000);

@@ -1,6 +1,9 @@
 {
   "hotkeys": {
-    "toggleWidget": "Ctrl+Shift+Space",
+    "commandBar": "Ctrl+Shift+Space",
+    "sendToLastAi": "Ctrl+Alt+Enter",
+    "listStylePicker": "Ctrl+Alt+L",
+    "toggleChecklist": "Ctrl+Alt+X",
     "pushToTalk": "Ctrl+Alt+M",
     "acceptSuggestion": "Tab",
     "dismiss": "Escape"
@@ -28,16 +31,29 @@
     "maxTokens": 60,
     "temperature": 0.3
   },
-  "speech": {
-    "model": "base.en",
-    "language": "en",
-    "insertMode": "SendInput"
+  "button": { "enabled": true, "hideWhileTyping": true },
+  "smartLists": {
+    "enabled": true,
+    "autoContinue": true,
+    "tabIndent": true,
+    "defaultNumberStyle": "1.",
+    "defaultBullet": "•",
+    "disabledProcesses": ["WINWORD.EXE", "ONENOTE.EXE", "OUTLOOK.EXE", "Notion.exe"]
   },
-  "blockedProcesses": [
-    "KeePassXC.exe",
-    "1Password.exe",
-    "Bitwarden.exe",
-    "mstsc.exe"
-  ],
+  "promptAssist": {
+    "detectPrompts": true,
+    "detectionThreshold": 0.6,
+    "lastTarget": "claude-web",
+    "targets": [
+      { "id": "claude-web", "label": "Claude", "method": "clipboard-open", "url": "https://claude.ai/new", "autoSubmit": false },
+      { "id": "chatgpt-web", "label": "ChatGPT", "method": "clipboard-open", "url": "https://chatgpt.com/", "autoSubmit": false },
+      { "id": "gemini-web", "label": "Gemini", "method": "clipboard-open", "url": "https://gemini.google.com/app", "autoSubmit": false },
+      { "id": "cursor", "label": "Cursor", "method": "clipboard-focus", "process": "Cursor.exe", "openChatKeys": "Ctrl+L", "autoSubmit": false }
+    ]
+  },
+  "snippets": { "enabled": true, "triggerPrefix": ";" },
+  "translateTargets": ["English", "Arabic"],
+  "speech": { "model": "base.en", "language": "en", "insertMode": "SendInput" },
+  "blockedProcesses": ["KeePassXC.exe", "1Password.exe", "Bitwarden.exe", "mstsc.exe"],
   "startWithWindows": false
 }

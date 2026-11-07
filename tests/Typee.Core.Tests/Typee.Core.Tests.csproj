@@ -24,4 +24,7 @@
     <ProjectReference Include="..\..\src\Typee.Core\Typee.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\settings.example.json" Link="settings.example.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

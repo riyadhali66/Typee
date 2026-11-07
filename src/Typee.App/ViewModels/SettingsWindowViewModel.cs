@@ -12,15 +12,40 @@ public partial class SettingsWindowViewModel : ObservableObject
     private readonly ISettingsStore _settingsStore;
     private readonly ILogger _logger;
 
+    private readonly Dictionary<string, (Func<string> Get, Action<string> Set)> _hotkeyEditors;
+
     public SettingsWindowViewModel(ISettingsStore settingsStore, ILogger logger)
     {
         _settingsStore = settingsStore;
         _logger = logger;
+
+        _hotkeyEditors = new Dictionary<string, (Func<string>, Action<string>)>(StringComparer.Ordinal)
+        {
+            [nameof(CommandBarHotkey)] = (() => CommandBarHotkey, v => CommandBarHotkey = v),
+            [nameof(SendToLastAiHotkey)] = (() => SendToLastAiHotkey, v => SendToLastAiHotkey = v),
+            [nameof(ListStylePickerHotkey)] = (() => ListStylePickerHotkey, v => ListStylePickerHotkey = v),
+            [nameof(ToggleChecklistHotkey)] = (() => ToggleChecklistHotkey, v => ToggleChecklistHotkey = v),
+            [nameof(PushToTalkHotkey)] = (() => PushToTalkHotkey, v => PushToTalkHotkey = v),
+            [nameof(AcceptSuggestionHotkey)] = (() => AcceptSuggestionHotkey, v => AcceptSuggestionHotkey = v),
+            [nameof(DismissHotkey)] = (() => DismissHotkey, v => DismissHotkey = v)
+        };
+
         LoadFrom(settingsStore.Current);
     }
 
+    // --- Hotkeys tab ---
+
     [ObservableProperty]
-    private string _toggleWidgetHotkey = "Ctrl+Shift+Space";
+    private string _commandBarHotkey = "Ctrl+Shift+Space";
+
+    [ObservableProperty]
+    private string _sendToLastAiHotkey = "Ctrl+Alt+Enter";
+
+    [ObservableProperty]
+    private string _listStylePickerHotkey = "Ctrl+Alt+L";
+
+    [ObservableProperty]
+    private string _toggleChecklistHotkey = "Ctrl+Alt+X";
 
     [ObservableProperty]
     private string _pushToTalkHotkey = "Ctrl+Alt+M";
@@ -30,6 +55,19 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _dismissHotkey = "Escape";
+
+    public IReadOnlyList<(string Label, string PropertyName)> HotkeyRows { get; } =
+    [
+        ("Command bar", "CommandBarHotkey"),
+        ("Send to last AI target", "SendToLastAiHotkey"),
+        ("List style picker", "ListStylePickerHotkey"),
+        ("Toggle checklist item", "ToggleChecklistHotkey"),
+        ("Push to talk (hold)", "PushToTalkHotkey"),
+        ("Accept suggestion", "AcceptSuggestionHotkey"),
+        ("Dismiss", "DismissHotkey")
+    ];
+
+    // --- General tab ---
 
     [ObservableProperty]
     private bool _suggestionsEnabled = true;
@@ -62,6 +100,26 @@ public partial class SettingsWindowViewModel : ObservableObject
     private int _grammarTimeoutMs = 400;
 
     [ObservableProperty]
+    private string _speechModel = "base.en";
+
+    [ObservableProperty]
+    private string _speechLanguage = "en";
+
+    [ObservableProperty]
+    private string _speechInsertMode = "SendInput";
+
+    [ObservableProperty]
+    private string _translateTargetsText = "English, Arabic";
+
+    [ObservableProperty]
+    private string _blockedProcessesText = string.Empty;
+
+    [ObservableProperty]
+    private bool _startWithWindows;
+
+    // --- LLM tab ---
+
+    [ObservableProperty]
     private string _llmBaseUrl = "http://localhost:11434/v1";
 
     [ObservableProperty]
@@ -79,20 +137,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private double _llmTemperature = 0.3;
 
-    [ObservableProperty]
-    private string _speechModel = "base.en";
-
-    [ObservableProperty]
-    private string _speechLanguage = "en";
-
-    [ObservableProperty]
-    private string _speechInsertMode = "SendInput";
-
-    [ObservableProperty]
-    private string _blockedProcessesText = string.Empty;
-
-    [ObservableProperty]
-    private bool _startWithWindows;
+    // --- Status / capture ---
 
     [ObservableProperty]
     private string _statusMessage = "Ready";
@@ -105,7 +150,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public void BeginHotkeyCapture(string target)
     {
         CapturingHotkeyTarget = target;
-        StatusMessage = $"Press a key combination for {target}… (Esc cancels capture)";
+        var label = HotkeyRows.FirstOrDefault(row => row.PropertyName == target).Label;
+        StatusMessage = $"Press a key combination for {label}… (Esc cancels capture)";
     }
 
     public bool TryApplyCapturedHotkey(string hotkeyText)
@@ -115,24 +161,19 @@ public partial class SettingsWindowViewModel : ObservableObject
             return false;
         }
 
-        switch (CapturingHotkeyTarget)
+        if (!_hotkeyEditors.TryGetValue(CapturingHotkeyTarget, out var editor))
         {
-            case nameof(ToggleWidgetHotkey):
-                ToggleWidgetHotkey = hotkeyText;
-                break;
-            case nameof(PushToTalkHotkey):
-                PushToTalkHotkey = hotkeyText;
-                break;
-            case nameof(AcceptSuggestionHotkey):
-                AcceptSuggestionHotkey = hotkeyText;
-                break;
-            case nameof(DismissHotkey):
-                DismissHotkey = hotkeyText;
-                break;
-            default:
-                return false;
+            return false;
         }
 
+        // Spec §5: never use Alt+Space (Windows system menu).
+        if (string.Equals(hotkeyText, "Alt+Space", StringComparison.OrdinalIgnoreCase))
+        {
+            StatusMessage = "Alt+Space is reserved for the Windows system menu — choose another combination";
+            return false;
+        }
+
+        editor.Set(hotkeyText);
         CapturingHotkeyTarget = string.Empty;
         StatusMessage = $"Captured {hotkeyText}";
         return true;
@@ -149,7 +190,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         try
         {
-            var settings = BuildSettings();
+            // Clone the store's current settings so sections without UI (button,
+            // smartLists, promptAssist, snippets) survive a save from this window.
+            var settings = _settingsStore.Current;
+            ApplyTo(settings);
             await _settingsStore.SaveAsync(settings).ConfigureAwait(true);
             StatusMessage = $"Saved {DateTime.Now:HH:mm:ss}";
             _logger.LogInformation("Settings saved from UI");
@@ -179,7 +223,10 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     private void LoadFrom(AppSettings settings)
     {
-        ToggleWidgetHotkey = settings.Hotkeys.ToggleWidget;
+        CommandBarHotkey = settings.Hotkeys.CommandBar;
+        SendToLastAiHotkey = settings.Hotkeys.SendToLastAi;
+        ListStylePickerHotkey = settings.Hotkeys.ListStylePicker;
+        ToggleChecklistHotkey = settings.Hotkeys.ToggleChecklist;
         PushToTalkHotkey = settings.Hotkeys.PushToTalk;
         AcceptSuggestionHotkey = settings.Hotkeys.AcceptSuggestion;
         DismissHotkey = settings.Hotkeys.Dismiss;
@@ -207,56 +254,47 @@ public partial class SettingsWindowViewModel : ObservableObject
         SpeechLanguage = settings.Speech.Language;
         SpeechInsertMode = settings.Speech.InsertMode;
 
+        TranslateTargetsText = string.Join(", ", settings.TranslateTargets);
         BlockedProcessesText = string.Join(Environment.NewLine, settings.BlockedProcesses);
         StartWithWindows = settings.StartWithWindows;
     }
 
-    private AppSettings BuildSettings()
+    private void ApplyTo(AppSettings settings)
     {
-        return new AppSettings
-        {
-            Hotkeys = new HotkeySettings
-            {
-                ToggleWidget = ToggleWidgetHotkey.Trim(),
-                PushToTalk = PushToTalkHotkey.Trim(),
-                AcceptSuggestion = AcceptSuggestionHotkey.Trim(),
-                Dismiss = DismissHotkey.Trim()
-            },
-            Suggestions = new SuggestionSettings
-            {
-                Enabled = SuggestionsEnabled,
-                DebounceMs = DebounceMs,
-                MinCharsBeforeSuggest = MinCharsBeforeSuggest,
-                MaxContextChars = MaxContextChars,
-                Level1GrammarEnabled = Level1GrammarEnabled,
-                Level2CompletionEnabled = Level2CompletionEnabled
-            },
-            Grammar = new GrammarSettings
-            {
-                Engine = "harper",
-                Dialect = GrammarDialect,
-                LlmDeepCheck = LlmDeepCheck,
-                DisabledRules = SplitList(DisabledRulesText, ','),
-                RequestTimeoutMs = GrammarTimeoutMs
-            },
-            Llm = new LlmSettings
-            {
-                BaseUrl = LlmBaseUrl.Trim(),
-                Model = LlmModel.Trim(),
-                ApiKeyEnvVar = ApiKeyEnvVar.Trim(),
-                TimeoutMs = LlmTimeoutMs,
-                MaxTokens = LlmMaxTokens,
-                Temperature = LlmTemperature
-            },
-            Speech = new SpeechSettings
-            {
-                Model = SpeechModel.Trim(),
-                Language = SpeechLanguage.Trim(),
-                InsertMode = SpeechInsertMode.Trim()
-            },
-            BlockedProcesses = SplitList(BlockedProcessesText, '\n', '\r', ','),
-            StartWithWindows = StartWithWindows
-        };
+        settings.Hotkeys.CommandBar = CommandBarHotkey.Trim();
+        settings.Hotkeys.SendToLastAi = SendToLastAiHotkey.Trim();
+        settings.Hotkeys.ListStylePicker = ListStylePickerHotkey.Trim();
+        settings.Hotkeys.ToggleChecklist = ToggleChecklistHotkey.Trim();
+        settings.Hotkeys.PushToTalk = PushToTalkHotkey.Trim();
+        settings.Hotkeys.AcceptSuggestion = AcceptSuggestionHotkey.Trim();
+        settings.Hotkeys.Dismiss = DismissHotkey.Trim();
+
+        settings.Suggestions.Enabled = SuggestionsEnabled;
+        settings.Suggestions.DebounceMs = DebounceMs;
+        settings.Suggestions.MinCharsBeforeSuggest = MinCharsBeforeSuggest;
+        settings.Suggestions.MaxContextChars = MaxContextChars;
+        settings.Suggestions.Level1GrammarEnabled = Level1GrammarEnabled;
+        settings.Suggestions.Level2CompletionEnabled = Level2CompletionEnabled;
+
+        settings.Grammar.Dialect = GrammarDialect;
+        settings.Grammar.LlmDeepCheck = LlmDeepCheck;
+        settings.Grammar.DisabledRules = SplitList(DisabledRulesText, ',');
+        settings.Grammar.RequestTimeoutMs = GrammarTimeoutMs;
+
+        settings.Llm.BaseUrl = LlmBaseUrl.Trim();
+        settings.Llm.Model = LlmModel.Trim();
+        settings.Llm.ApiKeyEnvVar = ApiKeyEnvVar.Trim();
+        settings.Llm.TimeoutMs = LlmTimeoutMs;
+        settings.Llm.MaxTokens = LlmMaxTokens;
+        settings.Llm.Temperature = LlmTemperature;
+
+        settings.Speech.Model = SpeechModel.Trim();
+        settings.Speech.Language = SpeechLanguage.Trim();
+        settings.Speech.InsertMode = SpeechInsertMode.Trim();
+
+        settings.TranslateTargets = SplitList(TranslateTargetsText, ',');
+        settings.BlockedProcesses = SplitList(BlockedProcessesText, '\n', '\r', ',');
+        settings.StartWithWindows = StartWithWindows;
     }
 
     private static List<string> SplitList(string text, params char[] separators)
