@@ -1,0 +1,146 @@
+<Window x:Class="Typee.App.Windows.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Typee Settings"
+        Height="720"
+        Width="760"
+        MinHeight="560"
+        MinWidth="640"
+        WindowStartupLocation="CenterScreen"
+        Background="#FFF7F8FA">
+  <!--
+    Callers: TrayIconHost.ShowSettings creates SettingsWindow.
+    No Windows/ folder existed (verified). Edits settings.json via VM.
+    Instruction: Settings window that edits and saves settings.json, including hotkey capture.
+  -->
+  <Window.Resources>
+    <Style TargetType="TextBox">
+      <Setter Property="Margin" Value="0,0,0,8"/>
+      <Setter Property="Padding" Value="6,4"/>
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="Margin" Value="0,0,0,8"/>
+      <Setter Property="Padding" Value="6,4"/>
+    </Style>
+    <Style x:Key="SectionHeader" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="0,12,0,8"/>
+    </Style>
+    <Style x:Key="FieldLabel" TargetType="TextBlock">
+      <Setter Property="Margin" Value="0,0,0,4"/>
+      <Setter Property="Foreground" Value="#FF333333"/>
+    </Style>
+  </Window.Resources>
+
+  <DockPanel Margin="16">
+    <DockPanel DockPanel.Dock="Bottom" LastChildFill="False" Margin="0,12,0,0">
+      <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="#FF555555"/>
+      <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+        <Button Content="Reload" Width="90" Margin="0,0,8,0" Command="{Binding ReloadCommand}"/>
+        <Button Content="Save" Width="90" IsDefault="True" Command="{Binding SaveCommand}"/>
+      </StackPanel>
+    </DockPanel>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <TextBlock Text="Typee" FontSize="28" FontWeight="Bold"/>
+        <TextBlock Text="Typing assistant settings" Margin="0,0,0,8" Foreground="#FF666666"/>
+
+        <TextBlock Text="Hotkeys" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="Click Capture, then press the desired combination. Esc cancels capture." Foreground="#FF666666" Margin="0,0,0,8"/>
+
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+          </Grid.RowDefinitions>
+
+          <TextBlock Grid.Row="0" Text="Toggle widget" Style="{StaticResource FieldLabel}"/>
+          <TextBox Grid.Row="1" Text="{Binding ToggleWidgetHotkey, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"/>
+          <Button Grid.Row="1" Grid.Column="1" Content="Capture" Margin="8,0,0,8" Width="80"
+                  Click="CaptureToggleWidget_OnClick"/>
+
+          <TextBlock Grid.Row="2" Text="Push to talk" Style="{StaticResource FieldLabel}"/>
+          <TextBox Grid.Row="3" Text="{Binding PushToTalkHotkey, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"/>
+          <Button Grid.Row="3" Grid.Column="1" Content="Capture" Margin="8,0,0,8" Width="80"
+                  Click="CapturePushToTalk_OnClick"/>
+
+          <TextBlock Grid.Row="4" Text="Accept suggestion" Style="{StaticResource FieldLabel}"/>
+          <TextBox Grid.Row="5" Text="{Binding AcceptSuggestionHotkey, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"/>
+          <Button Grid.Row="5" Grid.Column="1" Content="Capture" Margin="8,0,0,8" Width="80"
+                  Click="CaptureAccept_OnClick"/>
+
+          <TextBlock Grid.Row="6" Text="Dismiss" Style="{StaticResource FieldLabel}"/>
+          <TextBox Grid.Row="7" Text="{Binding DismissHotkey, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"/>
+          <Button Grid.Row="7" Grid.Column="1" Content="Capture" Margin="8,0,0,8" Width="80"
+                  Click="CaptureDismiss_OnClick"/>
+        </Grid>
+
+        <TextBlock Text="Suggestions" Style="{StaticResource SectionHeader}"/>
+        <CheckBox Content="Suggestions enabled" IsChecked="{Binding SuggestionsEnabled}"/>
+        <TextBlock Text="Debounce (ms)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding DebounceMs, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Minimum characters before suggest" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding MinCharsBeforeSuggest, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Max context characters" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding MaxContextChars, UpdateSourceTrigger=PropertyChanged}"/>
+        <CheckBox Content="Level 1 grammar enabled" IsChecked="{Binding Level1GrammarEnabled}"/>
+        <CheckBox Content="Level 2 completion enabled" IsChecked="{Binding Level2CompletionEnabled}"/>
+
+        <TextBlock Text="Grammar (Harper)" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="Dialect" Style="{StaticResource FieldLabel}"/>
+        <ComboBox ItemsSource="{Binding Dialects}" SelectedItem="{Binding GrammarDialect}"/>
+        <CheckBox Content="LLM deep check (optional, later phase)" IsChecked="{Binding LlmDeepCheck}"/>
+        <TextBlock Text="Disabled rules (comma-separated)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding DisabledRulesText, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Request timeout (ms)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding GrammarTimeoutMs, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="LLM" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="Base URL" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding LlmBaseUrl, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Model" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding LlmModel, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="API key environment variable (never stored in settings.json)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding ApiKeyEnvVar, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Timeout (ms)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding LlmTimeoutMs, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Max tokens" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding LlmMaxTokens, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Temperature" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding LlmTemperature, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Speech" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="Model" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding SpeechModel, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Language" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding SpeechLanguage, UpdateSourceTrigger=PropertyChanged}"/>
+        <TextBlock Text="Insert mode" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding SpeechInsertMode, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <TextBlock Text="Privacy" Style="{StaticResource SectionHeader}"/>
+        <TextBlock Text="Blocked processes (one per line)" Style="{StaticResource FieldLabel}"/>
+        <TextBox Text="{Binding BlockedProcessesText, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="True"
+                 Height="100"
+                 VerticalScrollBarVisibility="Auto"
+                 TextWrapping="Wrap"/>
+        <CheckBox Content="Start with Windows (wired in Phase 10)" IsChecked="{Binding StartWithWindows}"/>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

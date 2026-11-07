@@ -1,0 +1,43 @@
+{
+  "hotkeys": {
+    "toggleWidget": "Ctrl+Shift+Space",
+    "pushToTalk": "Ctrl+Alt+M",
+    "acceptSuggestion": "Tab",
+    "dismiss": "Escape"
+  },
+  "suggestions": {
+    "enabled": true,
+    "debounceMs": 500,
+    "minCharsBeforeSuggest": 12,
+    "maxContextChars": 1500,
+    "level1GrammarEnabled": true,
+    "level2CompletionEnabled": true
+  },
+  "grammar": {
+    "engine": "harper",
+    "dialect": "American",
+    "llmDeepCheck": false,
+    "disabledRules": [],
+    "requestTimeoutMs": 400
+  },
+  "llm": {
+    "baseUrl": "http://localhost:11434/v1",
+    "model": "llama3.1:8b",
+    "apiKeyEnvVar": "TYPEE_API_KEY",
+    "timeoutMs": 8000,
+    "maxTokens": 60,
+    "temperature": 0.3
+  },
+  "speech": {
+    "model": "base.en",
+    "language": "en",
+    "insertMode": "SendInput"
+  },
+  "blockedProcesses": [
+    "KeePassXC.exe",
+    "1Password.exe",
+    "Bitwarden.exe",
+    "mstsc.exe"
+  ],
+  "startWithWindows": false
+}

@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Importers: Typee.App.csproj, Typee.sln. Change TFM to net8.0-windows for Win32 work. Phase 1. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Typee.Core\Typee.Core.csproj" />
+  </ItemGroup>
+
+</Project>

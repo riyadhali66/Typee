@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Importers: Typee.sln. Affected: assembly name Typee, app.manifest PerMonitorV2. Phase 1 instruction. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>Typee.App</RootNamespace>
+    <AssemblyName>Typee</AssemblyName>
+    <Product>Typee</Product>
+    <Company>Typee</Company>
+    <Description>Typee – typing assistant</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Typee.Core\Typee.Core.csproj" />
+    <ProjectReference Include="..\Typee.Platform.Windows\Typee.Platform.Windows.csproj" />
+    <ProjectReference Include="..\Typee.Grammar\Typee.Grammar.csproj" />
+    <ProjectReference Include="..\Typee.Llm\Typee.Llm.csproj" />
+    <ProjectReference Include="..\Typee.Speech\Typee.Speech.csproj" />
+    <ProjectReference Include="..\Typee.Storage\Typee.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\settings.example.json" Link="settings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\tray.ico" />
+    <Resource Include="Assets\tray.png" />
+  </ItemGroup>
+
+</Project>
