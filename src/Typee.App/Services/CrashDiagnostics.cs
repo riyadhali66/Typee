@@ -1,12 +1,13 @@
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using Typee.Core.Abstractions;
 
 namespace Typee.App.Services;
 
-internal static class CrashDiagnostics
+internal static partial class CrashDiagnostics
 {
     private const string MarkerContent = "running";
 
@@ -35,7 +36,7 @@ internal static class CrashDiagnostics
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not copy diagnostics: {ex.Message}", "Typee", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Could not copy diagnostics: {ex.GetType().Name}", "Typee", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -62,6 +63,7 @@ internal static class CrashDiagnostics
                 .FirstOrDefault()
             : null;
 
+        builder.AppendLine("Typee diagnostic report (no keystrokes / typed text by policy)");
         builder.AppendLine($"Log file: {newestLog ?? "(none)"}");
         builder.AppendLine();
         if (newestLog is null || !File.Exists(newestLog))
@@ -70,12 +72,38 @@ internal static class CrashDiagnostics
             return builder.ToString();
         }
 
-        var tail = File.ReadLines(newestLog).TakeLast(50).ToList();
-        foreach (var line in tail)
+        // Only Serilog-shaped lines, truncated; strip control chars. Never invent content.
+        foreach (var line in File.ReadLines(newestLog).TakeLast(50))
         {
-            builder.AppendLine(line);
+            if (!SerilogLineRegex().IsMatch(line))
+            {
+                continue;
+            }
+
+            var sanitized = SanitizeLine(line);
+            builder.AppendLine(sanitized);
         }
 
         return builder.ToString();
     }
+
+    private static string SanitizeLine(string line)
+    {
+        var buffer = new StringBuilder(Math.Min(line.Length, 400));
+        foreach (var ch in line)
+        {
+            if (buffer.Length >= 400)
+            {
+                buffer.Append('…');
+                break;
+            }
+
+            buffer.Append(ch is >= ' ' or '\t' ? ch : ' ');
+        }
+
+        return buffer.ToString();
+    }
+
+    [GeneratedRegex(@"\[[A-Z]{3}\]", RegexOptions.CultureInvariant)]
+    private static partial Regex SerilogLineRegex();
 }

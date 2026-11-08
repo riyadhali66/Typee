@@ -34,6 +34,7 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     private long _droppedEvents;
     private int _lastSeenEventTick = Environment.TickCount;
     private int _previousSystemInputTick;
+    private int _lastReinstallTick;
     private Timer? _watchdogTimer;
     private volatile bool _disposing;
     private CancellationTokenSource? _consumerCts;
@@ -124,7 +125,7 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
 
     public event EventHandler<KeyboardEvent>? KeyEvent;
 
-    /// <summary>Installs the hook. Safe to call once; subsequent calls are no-ops.</summary>
+    /// <summary>Installs the hook. Safe to call once; subsequent calls are no-ops when healthy.</summary>
     public void Start()
     {
         lock (_gate)
@@ -134,7 +135,20 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
                 return;
             }
 
-            if (_thread is not null && !_thread.IsAlive)
+            // Alive thread with no hook is unhealthy — stop it before starting another.
+            if (_thread is { IsAlive: true })
+            {
+                if (_hookThreadId != 0)
+                {
+                    _ = PostThreadMessageW(_hookThreadId, WmQuit, 0, 0);
+                    _thread.Join(TimeSpan.FromSeconds(2));
+                }
+
+                _thread = null;
+                _hookHandle = 0;
+                _hookThreadId = 0;
+            }
+            else if (_thread is not null)
             {
                 _thread = null;
                 _hookHandle = 0;
@@ -235,12 +249,16 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
         _hookHandle = SetWindowsHookExW(WhKeyboardLl, Marshal.GetFunctionPointerForDelegate(HookProcDelegate), moduleHandle, 0);
         if (_hookHandle == 0)
         {
-            _logger.LogError("Reinstall SetWindowsHookEx failed with {Error}", Marshal.GetLastWin32Error());
+            _logger.LogError("Reinstall SetWindowsHookEx failed with {Error} — quitting hook thread for supervisor recovery",
+                Marshal.GetLastWin32Error());
+            // Exit the message loop so HookStoppedUnexpectedly fires and ServiceSupervisor can restart.
+            PostQuitMessage(0);
         }
         else
         {
             _logger.LogWarning("Keyboard hook reinstalled");
             Interlocked.Exchange(ref _lastSeenEventTick, Environment.TickCount);
+            Interlocked.Exchange(ref _lastReinstallTick, Environment.TickCount);
         }
     }
 
@@ -264,11 +282,33 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
 
     private void WatchdogTick(object? _)
     {
-        if (_disposing || _hookHandle == 0)
+        if (_disposing)
         {
             return;
         }
 
+        // If the hook vanished but the thread is still "alive", force a supervised restart.
+        if (_hookHandle == 0)
+        {
+            if (_thread is { IsAlive: true })
+            {
+                _logger.LogWarning("Hook watchdog found zero handle on live thread — restarting");
+                RestartHookThread();
+            }
+
+            return;
+        }
+
+        // Probe: if the hook thread cannot accept messages, restart it.
+        if (_hookThreadId != 0 && !PostThreadMessageW(_hookThreadId, WmNull, 0, 0))
+        {
+            _logger.LogWarning("Hook watchdog PostThreadMessage failed with {Error} — restarting", Marshal.GetLastWin32Error());
+            RestartHookThread();
+            return;
+        }
+
+        // GetLastInputInfo includes mouse (D8). Rate-limit and use a high lag threshold to
+        // reduce false-positive reinstalls from mouse-only activity.
         var info = new LastInputInfo { CbSize = (uint)Marshal.SizeOf<LastInputInfo>() };
         if (!GetLastInputInfo(ref info))
         {
@@ -284,7 +324,8 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
         _previousSystemInputTick = systemTick;
         var hookTick = Volatile.Read(ref _lastSeenEventTick);
         var lagMs = unchecked(systemTick - hookTick);
-        if (lagMs > 2000)
+        var sinceReinstall = unchecked(Environment.TickCount - Volatile.Read(ref _lastReinstallTick));
+        if (lagMs > 5000 && sinceReinstall > 30_000)
         {
             _logger.LogWarning("Hook watchdog detected {LagMs} ms input lag — reinstalling hook", lagMs);
             Reinstall();

@@ -14,6 +14,7 @@ internal static partial class NativeMethods
     public const int WmSysKeyDown = 0x0104;
     public const int WmSysKeyUp = 0x0105;
     public const int WmHotkey = 0x0312;
+    public const int WmNull = 0x0000;
     public const int WmDestroy = 0x0002;
     public const int WmClose = 0x0010;
     public const int WmQuit = 0x0012;
