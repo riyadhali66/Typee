@@ -19,4 +19,5 @@ logs/
 harper-ls.exe
 src/Typee.App/runtimes/harper/
 models/
+*.bin
 ggml-*.bin
