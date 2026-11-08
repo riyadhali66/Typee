@@ -61,9 +61,35 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             return 1; // Swallow only via the volatile flags — see KeyboardInterceptionState.
         }
 
-        if (_current is not null && !_current._channel.Writer.TryWrite(new KeyboardEvent(data.VkCode, isKeyDown, (uint)data.Time)))
+        if (_current is not null)
         {
-            Interlocked.Increment(ref _current._droppedEvents);
+            // Snapshot modifiers with GetAsyncKeyState — fast enough for the sub-ms budget.
+            var modifiers = KeyModifiers.None;
+            if ((GetAsyncKeyState(VkControl) & 0x8000) != 0)
+            {
+                modifiers |= KeyModifiers.Ctrl;
+            }
+
+            if ((GetAsyncKeyState(VkShift) & 0x8000) != 0)
+            {
+                modifiers |= KeyModifiers.Shift;
+            }
+
+            if ((GetAsyncKeyState(VkMenu) & 0x8000) != 0)
+            {
+                modifiers |= KeyModifiers.Alt;
+            }
+
+            if ((GetAsyncKeyState(VkLWin) & 0x8000) != 0 || (GetAsyncKeyState(VkRWin) & 0x8000) != 0)
+            {
+                modifiers |= KeyModifiers.Win;
+            }
+
+            if (!_current._channel.Writer.TryWrite(
+                    new KeyboardEvent(data.VkCode, isKeyDown, data.Flags, modifiers, (uint)data.Time, IsInjected: false)))
+            {
+                Interlocked.Increment(ref _current._droppedEvents);
+            }
         }
 
         return CallNextHookEx(0, code, wParam, lParam);

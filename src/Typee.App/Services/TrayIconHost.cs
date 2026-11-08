@@ -9,26 +9,34 @@ using Typee.App.ViewModels;
 using Typee.App.Windows;
 using Typee.Core.Abstractions;
 using Typee.Core.Settings;
+using Typee.Core.Typing;
 
 namespace Typee.App.Services;
 
 public sealed class TrayIconHost : IDisposable
 {
+    private const string DefaultTooltip = "Typee – typing assistant";
+
     private readonly ISettingsStore _settingsStore;
     private readonly IAppPaths _paths;
+    private readonly TypingActivityService _typingActivity;
     private readonly ILogger<TrayIconHost> _logger;
     private readonly TaskbarIcon _trayIcon;
     private readonly MenuItem _pauseResumeItem;
+    private readonly MenuItem _showKeyActivityItem;
     private SettingsWindow? _settingsWindow;
+    private bool _showKeyActivity;
     private bool _disposed;
 
     public TrayIconHost(
         ISettingsStore settingsStore,
         IAppPaths paths,
+        TypingActivityService typingActivity,
         ILogger<TrayIconHost> logger)
     {
         _settingsStore = settingsStore;
         _paths = paths;
+        _typingActivity = typingActivity;
         _logger = logger;
 
         _pauseResumeItem = new MenuItem
@@ -43,6 +51,9 @@ public sealed class TrayIconHost : IDisposable
         var logsItem = new MenuItem { Header = "Open logs folder" };
         logsItem.Click += (_, _) => OpenLogsFolder();
 
+        _showKeyActivityItem = new MenuItem { Header = "Show key activity", IsCheckable = true };
+        _showKeyActivityItem.Click += OnShowKeyActivityClicked;
+
         var exitItem = new MenuItem { Header = "Exit" };
         exitItem.Click += (_, _) => ExitApplication();
 
@@ -50,12 +61,13 @@ public sealed class TrayIconHost : IDisposable
         menu.Items.Add(_pauseResumeItem);
         menu.Items.Add(settingsItem);
         menu.Items.Add(logsItem);
+        menu.Items.Add(_showKeyActivityItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(exitItem);
 
         _trayIcon = new TaskbarIcon
         {
-            ToolTipText = "Typee – typing assistant",
+            ToolTipText = DefaultTooltip,
             ContextMenu = menu,
             NoLeftClickDelay = true,
             Icon = CreateTrayIcon()
@@ -64,6 +76,8 @@ public sealed class TrayIconHost : IDisposable
         _trayIcon.TrayMouseDoubleClick += (_, _) => ShowSettings();
 
         _settingsStore.SettingsChanged += OnSettingsChanged;
+        _typingActivity.TypingPaused += OnTypingPaused;
+        _typingActivity.TypingResumed += OnTypingResumed;
         _logger.LogInformation("Tray icon ready");
     }
 
@@ -99,6 +113,8 @@ public sealed class TrayIconHost : IDisposable
 
         _disposed = true;
         _settingsStore.SettingsChanged -= OnSettingsChanged;
+        _typingActivity.TypingPaused -= OnTypingPaused;
+        _typingActivity.TypingResumed -= OnTypingResumed;
         _trayIcon.Dispose();
         _settingsWindow?.Close();
     }
@@ -110,6 +126,55 @@ public sealed class TrayIconHost : IDisposable
             _pauseResumeItem.Header = settings.Suggestions.Enabled
                 ? "Pause suggestions"
                 : "Enable suggestions";
+        });
+    }
+
+    private void OnShowKeyActivityClicked(object sender, RoutedEventArgs e)
+    {
+        _showKeyActivity = _showKeyActivityItem.IsChecked;
+        if (!_showKeyActivity)
+        {
+            _trayIcon.ToolTipText = DefaultTooltip;
+            _logger.LogInformation("Key activity debug off");
+            return;
+        }
+
+        _trayIcon.ToolTipText = "Typee – waiting (paused)";
+        _logger.LogInformation("Key activity debug on (status only, never keys)");
+    }
+
+    private void OnTypingPaused(object? sender, EventArgs e)
+    {
+        if (!_showKeyActivity)
+        {
+            return;
+        }
+
+        // Status only — never log or display virtual keys / text.
+        _logger.LogInformation("Typing activity: paused");
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (_showKeyActivity)
+            {
+                _trayIcon.ToolTipText = "Typee – waiting (paused)";
+            }
+        });
+    }
+
+    private void OnTypingResumed(object? sender, EventArgs e)
+    {
+        if (!_showKeyActivity)
+        {
+            return;
+        }
+
+        _logger.LogInformation("Typing activity: typing");
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            if (_showKeyActivity)
+            {
+                _trayIcon.ToolTipText = "Typee – typing";
+            }
         });
     }
 

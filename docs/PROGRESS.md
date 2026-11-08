@@ -52,7 +52,7 @@ Verified: `dotnet build -c Release` 0 warnings/0 errors; `dotnet test` green. No
 
 ---
 
-## Phase 2 — Keyboard hook + hotkeys — IN PROGRESS
+## Phase 2 — Keyboard hook + hotkeys — DONE (pending manual soak)
 
 Plan (files):
 - `src/Typee.Core/Input/HotkeyGesture.cs` — pure parser "Ctrl+Shift+Space" → modifiers + VK; validation (no Alt+Space, no bare modifiers); normalization. Unit-tested.
@@ -72,8 +72,10 @@ Tasks:
 - [x] Platform: KeyboardHookService (thread + loop + channel + swallow flags)
 - [x] Platform: HotkeyService (RegisterHotKey + hook-observed gestures)
 - [x] App: DI wiring + hot-reload re-registration
-- [ ] App: tray "Show key activity" debug option — **deferred** (not in the Z.ai draft)
-- [ ] Gate: CI build/test on windows-latest (PR zai → main), then manual soak on a real desktop
+- [x] App: tray "Show key activity" debug option (status only: typing/paused)
+- [x] KeyboardEvent carries flags + modifiers (+ injected=false after LL filter)
+- [x] Typing debounce hot-reloads with settings
+- [ ] Gate: manual soak on a real desktop (10 min fast typing, hotkeys, pause events in logs)
 
 ### Phase 2 review notes (Z.ai draft → fixes)
 

@@ -98,6 +98,16 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     internal static partial uint GetCurrentThreadId();
 
+    /// <summary>High bit set means the key is currently down. Used only to snapshot modifiers in the LL hook.</summary>
+    [LibraryImport("user32.dll", SetLastError = false)]
+    internal static partial short GetAsyncKeyState(int vKey);
+
+    public const int VkShift = 0x10;
+    public const int VkControl = 0x11;
+    public const int VkMenu = 0x12;
+    public const int VkLWin = 0x5B;
+    public const int VkRWin = 0x5C;
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate nint HookProc(int code, nint wParam, nint lParam);
 

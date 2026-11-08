@@ -77,7 +77,7 @@ public sealed class TypingActivityServiceTests : IDisposable
         _time.Advance(TimeSpan.FromMilliseconds(500));
         Assert.Equal(["resumed", "paused"], _events);
 
-        _keyboard.Raise(new KeyboardEvent('A', IsKeyDown: false, Timestamp: 1));
+        _keyboard.Raise(new KeyboardEvent('A', IsKeyDown: false, Flags: 0, Modifiers: KeyModifiers.None, Timestamp: 1));
         Assert.Equal(["resumed", "paused"], _events);
     }
 
@@ -112,7 +112,8 @@ public sealed class TypingActivityServiceTests : IDisposable
         Assert.Equal(["resumed", "paused"], _events);
     }
 
-    private void Press(char vk) => _keyboard.Raise(new KeyboardEvent(vk, IsKeyDown: true, Timestamp: 0));
+    private void Press(char vk) =>
+        _keyboard.Raise(new KeyboardEvent(vk, IsKeyDown: true, Flags: 0, Modifiers: KeyModifiers.None, Timestamp: 0));
 
     public void Dispose() => _service.Dispose();
 

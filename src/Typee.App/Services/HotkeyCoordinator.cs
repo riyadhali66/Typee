@@ -2,24 +2,31 @@ using System.Windows;
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
 using Typee.Core.Settings;
+using Typee.Core.Typing;
 
 namespace Typee.App.Services;
 
 /// <summary>
 /// Registers the global hotkeys from settings, re-registers on settings hot-reload,
-/// and surfaces registration failures in the UI.
+/// applies typing debounce changes, and surfaces registration failures in the UI.
 /// </summary>
 public sealed class HotkeyCoordinator : IDisposable
 {
     private readonly IHotkeyService _hotkeyService;
     private readonly ISettingsStore _settingsStore;
+    private readonly TypingActivityService _typingActivity;
     private readonly ILogger<HotkeyCoordinator> _logger;
     private bool _disposed;
 
-    public HotkeyCoordinator(IHotkeyService hotkeyService, ISettingsStore settingsStore, ILogger<HotkeyCoordinator> logger)
+    public HotkeyCoordinator(
+        IHotkeyService hotkeyService,
+        ISettingsStore settingsStore,
+        TypingActivityService typingActivity,
+        ILogger<HotkeyCoordinator> logger)
     {
         _hotkeyService = hotkeyService;
         _settingsStore = settingsStore;
+        _typingActivity = typingActivity;
         _logger = logger;
         _settingsStore.SettingsChanged += OnSettingsChanged;
         _hotkeyService.RegistrationFailed += OnRegistrationFailed;
@@ -27,6 +34,7 @@ public sealed class HotkeyCoordinator : IDisposable
 
     public void ApplyFromSettings(AppSettings settings)
     {
+        _typingActivity.Configure(settings.Suggestions.DebounceMs);
         _hotkeyService.UnregisterAll();
 
         // Modifier-only gestures are registered via RegisterHotKey (authoritative).
