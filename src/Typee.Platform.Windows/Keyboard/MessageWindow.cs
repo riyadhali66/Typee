@@ -42,15 +42,17 @@ internal sealed class MessageWindow : IDisposable
         }
 
         var done = new ManualResetEventSlim(false);
-        ObjectDisposedException? failure = null;
+        Exception? failure = null;
         _queue.Enqueue(() =>
         {
             try
             {
                 action();
             }
-            catch (ObjectDisposedException ex)
+            catch (Exception ex)
             {
+                // Never let an exception unwind into the native WndProc — capture it and
+                // rethrow on the calling thread instead.
                 failure = ex;
             }
             finally
@@ -72,7 +74,7 @@ internal sealed class MessageWindow : IDisposable
 
         if (failure is not null)
         {
-            throw failure;
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
         }
 
         return true;

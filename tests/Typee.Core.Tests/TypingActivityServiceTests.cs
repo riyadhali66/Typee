@@ -34,6 +34,22 @@ public sealed class TypingActivityServiceTests : IDisposable
     }
 
     [Fact]
+    public void Handler_WaitingOnAnotherThreadThatCallsConfigure_DoesNotDeadlock()
+    {
+        // Real-world shape: a handler synchronously marshals to another thread (e.g. the UI
+        // dispatcher) which calls back into the service. Events must fire outside the lock.
+        var configuredFromOtherThread = false;
+        _service.TypingResumed += (_, _) =>
+            configuredFromOtherThread = Task.Run(() => _service.Configure(300)).Wait(TimeSpan.FromSeconds(2));
+
+        Press('A');
+
+        Assert.True(configuredFromOtherThread, "Configure on another thread blocked: event raised under the lock.");
+        _time.Advance(TimeSpan.FromMilliseconds(300));
+        Assert.Equal(["resumed", "paused"], _events);
+    }
+
+    [Fact]
     public void ContinuedTyping_RearmsDebounce_NoIntermediatePause()
     {
         Press('A');

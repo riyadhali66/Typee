@@ -248,17 +248,21 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
             return false;
         }
 
-        if ((gesture.Modifiers & KeyModifiers.Ctrl) != 0 && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Control))
+        // The LL hook reports side-specific modifier codes (VK_LCONTROL …); accept either side.
+        if ((gesture.Modifiers & KeyModifiers.Ctrl) != 0
+            && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Control, VirtualKeys.LControl, VirtualKeys.RControl))
         {
             return false;
         }
 
-        if ((gesture.Modifiers & KeyModifiers.Shift) != 0 && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Shift))
+        if ((gesture.Modifiers & KeyModifiers.Shift) != 0
+            && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Shift, VirtualKeys.LShift, VirtualKeys.RShift))
         {
             return false;
         }
 
-        if ((gesture.Modifiers & KeyModifiers.Alt) != 0 && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Alt))
+        if ((gesture.Modifiers & KeyModifiers.Alt) != 0
+            && !_pressedVirtualKeys.ContainsAny(VirtualKeys.Alt, VirtualKeys.LAlt, VirtualKeys.RAlt))
         {
             return false;
         }

@@ -12,6 +12,7 @@ public sealed class TypingActivityService : IDisposable
 {
     private readonly object _gate = new();
     private readonly ITimer _timer;
+    private readonly IKeyboardEvents _keyboardEvents;
     private int _debounceMs;
     private bool _isPaused = true;
 
@@ -19,7 +20,8 @@ public sealed class TypingActivityService : IDisposable
     {
         _debounceMs = Math.Max(50, debounceMs);
         _timer = timeProvider.CreateTimer(OnTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        keyboardEvents.KeyEvent += OnKeyEvent;
+        _keyboardEvents = keyboardEvents;
+        _keyboardEvents.KeyEvent += OnKeyEvent;
     }
 
     public event EventHandler? TypingPaused;
@@ -46,14 +48,18 @@ public sealed class TypingActivityService : IDisposable
             return;
         }
 
+        bool resumed;
         lock (_gate)
         {
             _timer.Change(TimeSpan.FromMilliseconds(_debounceMs), Timeout.InfiniteTimeSpan);
-            if (_isPaused)
-            {
-                _isPaused = false;
-                TypingResumed?.Invoke(this, EventArgs.Empty);
-            }
+            resumed = _isPaused;
+            _isPaused = false;
+        }
+
+        // Raise outside the lock so a handler that calls back in (e.g. Configure) can't deadlock.
+        if (resumed)
+        {
+            TypingResumed?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -67,9 +73,14 @@ public sealed class TypingActivityService : IDisposable
             }
 
             _isPaused = true;
-            TypingPaused?.Invoke(this, EventArgs.Empty);
         }
+
+        TypingPaused?.Invoke(this, EventArgs.Empty);
     }
 
-    public void Dispose() => _timer.Dispose();
+    public void Dispose()
+    {
+        _keyboardEvents.KeyEvent -= OnKeyEvent;
+        _timer.Dispose();
+    }
 }

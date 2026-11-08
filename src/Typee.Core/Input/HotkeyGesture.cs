@@ -163,9 +163,16 @@ public static class VirtualKeys
     public const int Delete = 0x2E;
     public const int LWin = 0x5B;
     public const int RWin = 0x5C;
+    public const int LShift = 0xA0;
+    public const int RShift = 0xA1;
+    public const int LControl = 0xA2;
+    public const int RControl = 0xA3;
+    public const int LAlt = 0xA4;
+    public const int RAlt = 0xA5;
 
     public static bool IsModifierKey(int vk) =>
-        vk is Shift or Control or Alt or LWin or RWin;
+        vk is Shift or Control or Alt or LWin or RWin
+            or LShift or RShift or LControl or RControl or LAlt or RAlt;
 }
 
 /// <summary>Key-name ↔ virtual-key table. Pure data, unit-testable.</summary>

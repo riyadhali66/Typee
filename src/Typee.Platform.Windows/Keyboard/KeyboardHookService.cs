@@ -105,7 +105,9 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
         _current = this;
 
         var moduleHandle = GetModuleHandleW(null);
-        _hookHandle = SetWindowsHookExW(WhKeyboardLl, HookProcDelegate, moduleHandle, 0);
+        // LibraryImport can't marshal delegates: pass a function pointer. HookProcDelegate is a
+        // static field, so it is never collected while the hook is installed.
+        _hookHandle = SetWindowsHookExW(WhKeyboardLl, Marshal.GetFunctionPointerForDelegate(HookProcDelegate), moduleHandle, 0);
         _hookThreadId = GetCurrentThreadId();
         ready.Set();
 
@@ -146,7 +148,25 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
         {
             await foreach (var keyboardEvent in _channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
             {
-                KeyEvent?.Invoke(this, keyboardEvent);
+                var handlers = KeyEvent;
+                if (handlers is null)
+                {
+                    continue;
+                }
+
+                // Invoke each subscriber separately: one failing consumer must not stop the
+                // loop or starve the others (fail safely — rule 5). Log the type only, never keys.
+                foreach (var handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        ((EventHandler<KeyboardEvent>)handler)(this, keyboardEvent);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Keyboard event subscriber {Subscriber} threw", handler.Method.DeclaringType?.Name);
+                    }
+                }
             }
         }
         catch (OperationCanceledException)

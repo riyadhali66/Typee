@@ -52,7 +52,7 @@ public partial class App : Application
         };
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
-            Log.Fatal(args.Exception, "Unhandled task exception");
+            Log.Fatal(args.Exception, "Unobserved task exception");
             args.SetObserved();
         };
 

@@ -66,4 +66,16 @@ public sealed class HotkeyGestureTests
             Assert.Equal(text, gesture.NormalizedText);
         }
     }
+
+    [Theory]
+    [InlineData(0xA0)] // VK_LSHIFT
+    [InlineData(0xA1)] // VK_RSHIFT
+    [InlineData(0xA2)] // VK_LCONTROL
+    [InlineData(0xA3)] // VK_RCONTROL
+    [InlineData(0xA4)] // VK_LMENU
+    [InlineData(0xA5)] // VK_RMENU
+    public void IsModifierKey_IncludesSideSpecificCodesTheHookReports(int vk)
+    {
+        Assert.True(VirtualKeys.IsModifierKey(vk));
+    }
 }

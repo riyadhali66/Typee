@@ -29,7 +29,7 @@ internal static partial class NativeMethods
     public const uint ModWin = 0x8;
 
     [LibraryImport("user32.dll", SetLastError = true)]
-    internal static partial nint SetWindowsHookExW(int idHook, HookProc lpfn, nint hMod, uint dwThreadId);
+    internal static partial nint SetWindowsHookExW(int idHook, nint lpfn, nint hMod, uint dwThreadId);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
