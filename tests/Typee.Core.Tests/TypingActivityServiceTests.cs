@@ -39,8 +39,13 @@ public sealed class TypingActivityServiceTests : IDisposable
         // Real-world shape: a handler synchronously marshals to another thread (e.g. the UI
         // dispatcher) which calls back into the service. Events must fire outside the lock.
         var configuredFromOtherThread = false;
+
+        // The synchronous wait IS the scenario under test (a handler blocking on another thread),
+        // so xUnit1031's "don't block" advice doesn't apply here. Bounded by a 2 s timeout.
+#pragma warning disable xUnit1031
         _service.TypingResumed += (_, _) =>
             configuredFromOtherThread = Task.Run(() => _service.Configure(300)).Wait(TimeSpan.FromSeconds(2));
+#pragma warning restore xUnit1031
 
         Press('A');
 
