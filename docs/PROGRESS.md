@@ -9,7 +9,7 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | Field | Value |
 |---|---|
 | Current branch | `phase/3-caret-uia` |
-| Last completed | Phase 3: caret locator + UIA text context + debug caret marker |
+| Last completed | Phase 3 privacy fail-closed (elevation/password/TOCTOU) |
 | Next task | Manual Checkpoint A matrix; then Phase 4 overlay |
 | Half-done | None |
 | Uncommitted risks | None |
@@ -21,8 +21,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 |---|---|---|
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
 | 1+ — Hardening now (crash/settings/DLL) | [x] | §9 now |
-| 2 — Keyboard hook + hotkeys | [x] code + §9 P2 watchdog/events; soak [ ] | 956ce66 |
-| 3 — Caret tracking + UIA text context | [x] code; Checkpoint A manual [ ] | feat(phase-3) |
+| 2 — Keyboard hook + hotkeys | [x] code + §9 P2 raw-input watchdog; soak [x] | d3251d8 |
+| 3 — Caret tracking + UIA text context | [x] code; Checkpoint A manual [ ] | feat(phase-3) + privacy fix |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
 | 6 — Harper grammar | [ ] | |
@@ -177,6 +177,7 @@ Tasks:
 - [x] Platform: UiaTextContextReader (read + select + range rects)
 - [x] Platform: FocusMonitor + element cache refresh
 - [x] Platform: ProcessInfoService (blocklist, password skip, elevation)
+- [x] Privacy: fail-closed elevation/password; `TryGetSafeFocusedElement` same-instance re-check
 - [x] App: caret marker debug window + wiring
 - [x] Gate: `dotnet build` / `dotnet test` — 0 warnings, 0 errors
 - [ ] Checkpoint A manual matrix (see below)

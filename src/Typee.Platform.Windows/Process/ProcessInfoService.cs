@@ -30,7 +30,70 @@ public sealed class ProcessInfoService : ITargetContextGuard
 
     public TargetSkipReason? GetSkipReason()
     {
-        var hwnd = GetForegroundWindow();
+        if (TryGetNonUiaSkipReason(out var hwnd, out var processName) is { } nonUia)
+        {
+            return nonUia;
+        }
+
+        if (IsPasswordFieldFailClosed())
+        {
+            return TargetSkipReason.PasswordField;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Privacy checks safe on the UIA STA thread (no nested Invoke).
+    /// When <paramref name="focusedElement"/> is supplied, password is evaluated on that
+    /// instance only (callers must use the same element for subsequent UIA work).
+    /// </summary>
+    public TargetSkipReason? GetSkipReasonOnUiaThread(
+        CUIAutomation8 automation,
+        IUIAutomationElement? focusedElement = null)
+    {
+        if (TryGetNonUiaSkipReason(out _, out _) is { } nonUia)
+        {
+            return nonUia;
+        }
+
+        var element = focusedElement ?? _elementCache.GetFocusedElement(automation);
+        if (IsPasswordElementFailClosed(element))
+        {
+            return TargetSkipReason.PasswordField;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves the focused element once, applies all privacy checks, and returns that
+    /// same instance for callers to use (closes mid-Invoke TOCTOU).
+    /// </summary>
+    public TargetSkipReason? TryGetSafeFocusedElement(
+        CUIAutomation8 automation,
+        out IUIAutomationElement? element)
+    {
+        element = null;
+        if (TryGetNonUiaSkipReason(out _, out _) is { } nonUia)
+        {
+            return nonUia;
+        }
+
+        element = _elementCache.GetFocusedElement(automation);
+        if (IsPasswordElementFailClosed(element))
+        {
+            element = null;
+            return TargetSkipReason.PasswordField;
+        }
+
+        return null;
+    }
+
+    private TargetSkipReason? TryGetNonUiaSkipReason(out nint hwnd, out string? processName)
+    {
+        hwnd = GetForegroundWindow();
+        processName = null;
         if (hwnd == 0)
         {
             return TargetSkipReason.NoForegroundWindow;
@@ -43,22 +106,18 @@ public sealed class ProcessInfoService : ITargetContextGuard
             return TargetSkipReason.FullScreenPause;
         }
 
-        var processName = TryGetProcessName(hwnd);
+        processName = TryGetProcessName(hwnd);
         if (processName is not null && IsBlocklisted(processName, settings.BlockedProcesses))
         {
             _logger.LogDebug("Skipping blocklisted process {Process}", processName);
             return TargetSkipReason.BlocklistedProcess;
         }
 
-        if (processName is not null && TryGetProcessId(hwnd) is uint pid && IsProcessElevated(pid))
+        // Fail closed: missing PID is unverifiable elevation.
+        if (TryGetProcessId(hwnd) is not uint pid || IsProcessElevatedOrUnknown(pid))
         {
-            _logger.LogDebug("Skipping elevated target process {Process}", processName);
+            _logger.LogDebug("Skipping elevated or unverifiable target process {Process}", processName ?? "(unknown)");
             return TargetSkipReason.ElevatedTarget;
-        }
-
-        if (IsPasswordField())
-        {
-            return TargetSkipReason.PasswordField;
         }
 
         return null;
@@ -92,34 +151,34 @@ public sealed class ProcessInfoService : ITargetContextGuard
         return pid == 0 ? null : pid;
     }
 
-    private static bool IsProcessElevated(uint processId)
+    /// <summary>Returns true if elevated OR elevation cannot be determined (fail closed).</summary>
+    private static bool IsProcessElevatedOrUnknown(uint processId)
     {
         var hProcess = OpenProcess(ProcessQueryLimitedInformation, false, processId);
         if (hProcess == 0)
         {
-            return false;
+            return true;
         }
 
         try
         {
             if (!OpenProcessToken(hProcess, TokenQuery, out var token))
             {
-                return false;
+                return true;
             }
 
             try
             {
-                var elevation = new TokenElevation();
                 var size = (uint)Marshal.SizeOf<TokenElevation>();
                 var ptr = Marshal.AllocHGlobal((int)size);
                 try
                 {
                     if (!GetTokenInformation(token, TokenElevationInformationClass, ptr, size, out _))
                     {
-                        return false;
+                        return true;
                     }
 
-                    elevation = Marshal.PtrToStructure<TokenElevation>(ptr);
+                    var elevation = Marshal.PtrToStructure<TokenElevation>(ptr);
                     return elevation.TokenIsElevated != 0;
                 }
                 finally
@@ -148,25 +207,49 @@ public sealed class ProcessInfoService : ITargetContextGuard
         return state is QunsRunningD3dFullScreen or QunsPresentationMode;
     }
 
-    private bool IsPasswordField()
+    private bool IsPasswordFieldFailClosed()
     {
-        return _uiaThread.Invoke(automation =>
+        // Tuple.Completed distinguishes timeout/default from a real "not password" result.
+        var probe = _uiaThread.Invoke(automation =>
         {
             var element = _elementCache.GetFocusedElement(automation);
-            if (element is null)
-            {
-                return false;
-            }
-
-            try
-            {
-                var value = element.GetCurrentPropertyValue(UIA_PropertyIds.UIA_IsPasswordPropertyId);
-                return value is true or 1;
-            }
-            catch
-            {
-                return false;
-            }
+            return (Completed: true, IsPassword: IsPasswordElementFailClosed(element));
         });
+
+        if (!probe.Completed)
+        {
+            return true;
+        }
+
+        return probe.IsPassword;
+    }
+
+    /// <summary>
+    /// Fail closed: only an explicit non-password property value allows work.
+    /// Null element, COM/property failure, or unrecognized VARIANT → treat as password.
+    /// </summary>
+    internal static bool IsPasswordElementFailClosed(IUIAutomationElement? element)
+    {
+        if (element is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            var value = element.GetCurrentPropertyValue(UIA_PropertyIds.UIA_IsPasswordPropertyId);
+            return value switch
+            {
+                false => false,
+                0 => false,
+                true => true,
+                1 => true,
+                _ => true
+            };
+        }
+        catch
+        {
+            return true;
+        }
     }
 }

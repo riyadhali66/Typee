@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
 using Typee.Core.Models;
 using Typee.Core.Text;
+using Typee.Platform.Windows.Process;
 using Interop.UIAutomationClient;
 
 namespace Typee.Platform.Windows.Uia;
@@ -9,18 +10,15 @@ namespace Typee.Platform.Windows.Uia;
 public sealed class UiaTextContextReader : ITextContextReader
 {
     private readonly UiaThread _uiaThread;
-    private readonly UiaElementCache _elementCache;
-    private readonly ITargetContextGuard _guard;
+    private readonly ProcessInfoService _guard;
     private readonly ILogger<UiaTextContextReader> _logger;
 
     public UiaTextContextReader(
         UiaThread uiaThread,
-        UiaElementCache elementCache,
-        ITargetContextGuard guard,
+        ProcessInfoService guard,
         ILogger<UiaTextContextReader> logger)
     {
         _uiaThread = uiaThread;
-        _elementCache = elementCache;
         _guard = guard;
         _logger = logger;
     }
@@ -44,7 +42,12 @@ public sealed class UiaTextContextReader : ITextContextReader
 
         return _uiaThread.Invoke(automation =>
         {
-            var pattern = GetTextPattern(automation);
+            if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null || element is null)
+            {
+                return null;
+            }
+
+            var pattern = UiaPatternHelper.TryGetTextPattern(element);
             if (pattern is null)
             {
                 return null;
@@ -72,7 +75,12 @@ public sealed class UiaTextContextReader : ITextContextReader
 
         return _uiaThread.Invoke(automation =>
         {
-            var pattern = GetTextPattern(automation);
+            if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null || element is null)
+            {
+                return false;
+            }
+
+            var pattern = UiaPatternHelper.TryGetTextPattern(element);
             if (pattern is null)
             {
                 return false;
@@ -99,7 +107,12 @@ public sealed class UiaTextContextReader : ITextContextReader
 
     private TextContext? ReadOnThread(CUIAutomation8 automation, int maxContextChars)
     {
-        var pattern = GetTextPattern(automation);
+        if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null || element is null)
+        {
+            return null;
+        }
+
+        var pattern = UiaPatternHelper.TryGetTextPattern(element);
         if (pattern is null)
         {
             return null;
@@ -154,17 +167,6 @@ public sealed class UiaTextContextReader : ITextContextReader
             _logger.LogDebug(ex, "UIA text read failed");
             return null;
         }
-    }
-
-    private IUIAutomationTextPattern? GetTextPattern(CUIAutomation8 automation)
-    {
-        var element = _elementCache.GetFocusedElement(automation);
-        if (element is null)
-        {
-            return null;
-        }
-
-        return UiaPatternHelper.TryGetTextPattern(element);
     }
 
     private static IUIAutomationTextRange? CreateRange(IUIAutomationTextPattern pattern, TextSpan span)

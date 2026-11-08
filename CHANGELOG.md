@@ -11,9 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Phase 3: `ICaretLocator` / `ITextContextReader` with UIA TextPattern + Win32 fallbacks; `ProcessInfoService` skips (blocklist, elevated, password, fullscreen); tray debug **Show caret marker**; `TextSegmenter` + layout math unit tests.
 - §9 hardening (now): crash marker + diagnostic clipboard offer; global exception handlers with tray notifications; `ServiceSupervisor` with 1s/5s/30s backoff for the keyboard hook.
 - Settings `schemaVersion` 1, migrator/validator, `settings.backup.json`, import/export/reset; Privacy tab (clear local data; DB wipe Phase 5).
-- `SetDefaultDllDirectories` at app startup; hook watchdog (`GetLastInputInfo`); system resume + `TaskbarCreated` handling.
+- `SetDefaultDllDirectories` at app startup; hook watchdog (Raw Input keyboard timestamps); system resume + `TaskbarCreated` handling.
 - Hardening & Release Readiness spec (`docs/MASTER_PROMPT.md` §9): Credential Manager keys, Velopack installer plan, Arabic/a11y, test harness (deferred).
 - Agent handoff section in `docs/PROGRESS.md`.
+
+### Fixed
+- Phase 3 privacy: elevation unknown/missing PID, password property unknown/null, and mid-Invoke focus TOCTOU all fail closed via `TryGetSafeFocusedElement`.
+- Hook watchdog: Raw Input keyboard sink (`RIDEV_INPUTSINK`) timestamps only — replaces `GetLastInputInfo` mouse false positives.
 
 ### Changed
 - Phase workflow: work on `phase/<n>-<name>` branches; push after every phase commit; tag checkpoints.

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
 using Typee.Core.Models;
+using Typee.Platform.Windows.Process;
 using Typee.Platform.Windows.Uia;
 using Interop.UIAutomationClient;
 using static Typee.Platform.Windows.Interop.NativeMethods;
@@ -10,18 +11,15 @@ namespace Typee.Platform.Windows.Caret;
 public sealed class CaretLocator : ICaretLocator
 {
     private readonly UiaThread _uiaThread;
-    private readonly UiaElementCache _elementCache;
-    private readonly ITargetContextGuard _guard;
+    private readonly ProcessInfoService _guard;
     private readonly ILogger<CaretLocator> _logger;
 
     public CaretLocator(
         UiaThread uiaThread,
-        UiaElementCache elementCache,
-        ITargetContextGuard guard,
+        ProcessInfoService guard,
         ILogger<CaretLocator> logger)
     {
         _uiaThread = uiaThread;
-        _elementCache = elementCache;
         _guard = guard;
         _logger = logger;
     }
@@ -35,12 +33,17 @@ public sealed class CaretLocator : ICaretLocator
 
         return _uiaThread.Invoke(automation =>
         {
+            // Resolve + privacy-check one focused element; use that instance only.
+            if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null)
+            {
+                return null;
+            }
+
             if (TryGuiThreadInfo(out var guiRect, out var method))
             {
                 return BuildLocation(guiRect, method);
             }
 
-            var element = _elementCache.GetFocusedElement(automation);
             if (element is null)
             {
                 return null;
