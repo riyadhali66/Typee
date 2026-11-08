@@ -35,6 +35,15 @@ internal static partial class NativeMethods
     public const int ErrorHotkeyAlreadyRegistered = 1409;
     public const nint HwndMessage = -3;
 
+    // Raw Input (keyboard activity probe for hook watchdog — header only, never key codes).
+    public const int WmInput = 0x00FF;
+    public const uint RidInput = 0x10000003;
+    public const uint RidHeader = 0x10000005;
+    public const uint RidevInputSink = 0x00000100;
+    public const ushort HidUsagePageGeneric = 0x01;
+    public const ushort HidUsageGenericKeyboard = 0x06;
+    public const uint RimTypeKeyboard = 1;
+
     // RegisterHotKey modifier constants (note: different from KeyModifiers flag values).
     public const uint ModAlt = 0x1;
     public const uint ModControl = 0x2;
@@ -134,6 +143,21 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll", SetLastError = false)]
     internal static partial short GetAsyncKeyState(int vKey);
 
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool RegisterRawInputDevices(
+        in RawInputDevice pRawInputDevices,
+        uint uiNumDevices,
+        uint cbSize);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial uint GetRawInputData(
+        nint hRawInput,
+        uint uiCommand,
+        nint pData,
+        ref uint pcbSize,
+        uint cbSizeHeader);
+
     public const int VkShift = 0x10;
     public const int VkControl = 0x11;
     public const int VkMenu = 0x12;
@@ -173,6 +197,24 @@ internal static partial class NativeMethods
     {
         public uint CbSize;
         public uint DwTime;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RawInputDevice
+    {
+        public ushort UsUsagePage;
+        public ushort UsUsage;
+        public uint DwFlags;
+        public nint HwndTarget;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct RawInputHeader
+    {
+        public uint DwType;
+        public uint DwSize;
+        public nint HDevice;
+        public nint WParam;
     }
 
     [StructLayout(LayoutKind.Sequential)]

@@ -23,6 +23,7 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     private const int ChannelCapacity = 8192;
 
     private readonly KeyboardInterceptionState _interception;
+    private readonly IRawKeyboardActivityClock _rawKeyboardClock;
     private readonly ILogger<KeyboardHookService> _logger;
     private readonly Channel<KeyboardEvent> _channel = Channel.CreateBounded<KeyboardEvent>(
         new BoundedChannelOptions(ChannelCapacity) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -33,7 +34,6 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     private uint _hookThreadId;
     private long _droppedEvents;
     private int _lastSeenEventTick = Environment.TickCount;
-    private int _previousSystemInputTick;
     private int _lastReinstallTick;
     private Timer? _watchdogTimer;
     private volatile bool _disposing;
@@ -117,9 +117,13 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
 
     private static KeyboardHookService? _current;
 
-    public KeyboardHookService(KeyboardInterceptionState interception, ILogger<KeyboardHookService> logger)
+    public KeyboardHookService(
+        KeyboardInterceptionState interception,
+        IRawKeyboardActivityClock rawKeyboardClock,
+        ILogger<KeyboardHookService> logger)
     {
         _interception = interception;
+        _rawKeyboardClock = rawKeyboardClock;
         _logger = logger;
     }
 
@@ -307,27 +311,14 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             return;
         }
 
-        // GetLastInputInfo includes mouse (D8). Rate-limit and use a high lag threshold to
-        // reduce false-positive reinstalls from mouse-only activity.
-        var info = new LastInputInfo { CbSize = (uint)Marshal.SizeOf<LastInputInfo>() };
-        if (!GetLastInputInfo(ref info))
+        // Raw-keyboard sink (RIDEV_INPUTSINK) vs LL-hook timestamps — never key codes.
+        var now = Environment.TickCount;
+        var lastRaw = _rawKeyboardClock.LastRawKeyboardTick;
+        var lastHook = Volatile.Read(ref _lastSeenEventTick);
+        var lastReinstall = Volatile.Read(ref _lastReinstallTick);
+        if (HookWatchdogDecision.ShouldReinstall(now, lastRaw, lastHook, lastReinstall))
         {
-            return;
-        }
-
-        var systemTick = (int)info.DwTime;
-        if (systemTick == _previousSystemInputTick)
-        {
-            return;
-        }
-
-        _previousSystemInputTick = systemTick;
-        var hookTick = Volatile.Read(ref _lastSeenEventTick);
-        var lagMs = unchecked(systemTick - hookTick);
-        var sinceReinstall = unchecked(Environment.TickCount - Volatile.Read(ref _lastReinstallTick));
-        if (lagMs > 5000 && sinceReinstall > 30_000)
-        {
-            _logger.LogWarning("Hook watchdog detected {LagMs} ms input lag — reinstalling hook", lagMs);
+            _logger.LogWarning("Hook watchdog: raw keyboard recent but hook quiet — reinstalling");
             Reinstall();
         }
     }

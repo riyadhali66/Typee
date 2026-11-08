@@ -8,10 +8,10 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/hardening-now` @ `5a44a5c` (merge to `main` via GitHub UI; `gh` unauthenticated) |
-| Last completed | §9 docs + P1/P2 hardening + review fixes (HWND message windows, safer watchdog) |
-| Next task | Merge PR → Phase 2 manual soak → Phase 3 when user says next phase |
-| Half-done | Interactive desktop soak not run in CI |
+| Current branch | `phase/hardening-now` (raw-input watchdog next commit; then `phase/3-caret-uia`) |
+| Last completed | Phase 2 soak: all good; Raw Input hook watchdog (no GetLastInputInfo) |
+| Next task | Push watchdog → Phase 3 caret/UIA → Checkpoint A |
+| Half-done | None |
 | Uncommitted risks | None |
 | Updated | 2026-11-08 (Cursor) |
 
