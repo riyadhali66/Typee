@@ -351,3 +351,121 @@ Rules: never use Alt+Space (Windows system menu). API keys come only from the en
 2. If existing work is found, write the audit to `docs/PROGRESS.md` and show me a summary.
 3. Show the final solution tree and the NuGet packages per project.
 4. Then implement the first unfinished phase only, run build + tests, report, and STOP.
+
+---
+
+## 9. Hardening & Release Readiness
+
+This is a **spec update**, not a restart. Keep all completed work. Before writing integration code for any library named here (Velopack, Windows Credential Manager APIs, WTS/power notifications), read its official docs. Do not guess APIs.
+
+### 1. Git & multi-tool workflow
+
+- `main` always builds and passes tests. Work on `phase/<n>-<name>` branches, merge to `main` when the phase passes the quality gate, then push.
+- Tag every checkpoint: `checkpoint-a`, `checkpoint-b`, `checkpoint-c`, `v1.0.0-rc1`.
+- Push after every phase commit.
+- This repo is worked on by more than one AI tool (ZCode and Cursor). Add a **"Handoff"** section at the top of `docs/PROGRESS.md`, updated at the end of every session: current branch, last completed task, next task, anything half-done, uncommitted risks. Any agent starting a session must read it first and run `git pull` before editing.
+- Keep a `CHANGELOG.md` (Keep a Changelog format) updated per phase.
+
+### 2. Crash safety (implement now — Phase 1 scope)
+
+- Global handlers: `AppDomain.CurrentDomain.UnhandledException`, `Application.DispatcherUnhandledException`, `TaskScheduler.UnobservedTaskException`. Log the error (no user text), show a small tray notice, keep running when recoverable.
+- Every background service runs inside a supervisor that restarts it with backoff (1 s, 5 s, 30 s) and gives up after 5 failures in 10 minutes, showing a tray warning naming the feature.
+- Write a crash marker file on unclean exit; on next start, offer "Typee closed unexpectedly — copy diagnostic report?".
+
+### 3. Keyboard hook resilience (Phase 2)
+
+- Windows silently removes a low-level hook whose callback exceeds `LowLevelHooksTimeout`. Add a **hook watchdog**: every 5 s compare `GetLastInputInfo` with the hook's last-seen event time; if the system saw keyboard input and the hook did not, reinstall the hook and log a warning.
+- Measure callback duration in Debug builds; log any callback over 1 ms.
+
+### 4. System events (Phases 2, 3, 6, 9)
+
+Handle all of these without restart:
+- **Sleep/resume** (power broadcast events) and **lock/unlock + fast user switching** (`WTSRegisterSessionNotification`): on resume/unlock reinstall the hook, re-register hotkeys, verify harper-ls is alive, re-open the audio device.
+- **Explorer restart:** listen for the `TaskbarCreated` message and re-add the tray icon.
+- **Display changes** (monitor plugged/unplugged, DPI change, resolution change): refresh monitor/DPI cache; reposition visible overlays.
+- **Focus Assist / full-screen apps / games:** use `SHQueryUserNotificationState` (and full-screen foreground detection) to auto-pause overlays and the Typee button while a full-screen app, game or presentation is running. Setting `pauseInFullscreen: true`.
+
+### 5. Performance budgets (all phases, checked at every checkpoint)
+
+| Metric | Budget |
+|---|---|
+| Idle CPU | < 1% |
+| RAM without Whisper loaded | < 150 MB (including harper-ls) |
+| Hook callback | < 1 ms (p99) |
+| Overlay shown after typing pause (local result) | < 50 ms |
+| Harper result | < 150 ms for a paragraph |
+| Startup to tray | < 2 s |
+
+Add a **Diagnostics window** (tray → Diagnostics) showing live counters: CPU, RAM, hook status + last reinstall, caret method used for the current app, harper-ls status, LLM status per profile, last errors. It must never display user text.
+
+### 6. Easier, safer API keys (Phase 7 / 8F)
+
+- Environment variables are hard for normal users. Add storage in **Windows Credential Manager** (per-user, encrypted): Settings → LLM → each profile has an "API key" box with Save / Clear / Test buttons.
+- Resolution order: Credential Manager entry → environment variable named in settings → none.
+- Keys never appear in settings.json, the database, logs, diagnostics, or crash reports. The UI shows only the last 4 characters.
+- "Test connection" sends a tiny request ("Reply with OK") and shows success/failure + latency.
+- Require HTTPS for any non-localhost `baseUrl`; refuse plain HTTP to remote hosts.
+- Add a simple **rate/cost guard** per profile: max requests per minute (default 20) and an optional daily request cap; when hit, LLM features pause with a tray notice and local features keep working.
+
+### 7. Settings robustness (implement now — Phase 1 scope)
+
+- Add `"schemaVersion": 1` to settings.json. Write a migration step for every future schema change; unit-test migrations.
+- Validate settings on load (hotkey syntax, URLs, numeric ranges). Invalid values → fall back to the default for that field only, show which fields were reset.
+- Keep `settings.backup.json` (last known good). If settings.json is corrupt, restore from backup and notify.
+- Settings → "Export settings" / "Import settings" (keys excluded) and "Reset to defaults".
+
+### 8. Security hardening (now + Phase 10)
+
+- Call `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` at startup to block DLL hijacking.
+- All downloads (Harper, Whisper models, updates) verified by SHA256 before use; downloads over HTTPS only.
+- Never put user text in URLs, query strings, or logs (only the opt-in URL-prefill Send-to-AI method may, and only when the user enabled it).
+- `%LOCALAPPDATA%\Typee` created with default per-user permissions only.
+- Settings → "Privacy": buttons "Clear all learned data", "Delete all Typee data" (with confirmation), and a plain-language summary of what is stored where.
+
+### 9. Antivirus & SmartScreen readiness (Phase 10)
+
+Keyboard-hook apps are often flagged by antivirus. Reduce false positives:
+- No obfuscation, no packers, no self-modifying behavior, no hidden processes beyond harper-ls (visible in Task Manager with a clear description).
+- Fill in full assembly metadata (Company, Product "Typee", Description, Version, Copyright) for Typee.exe.
+- Prepare for Authenticode **code signing** (document the steps in `docs/RELEASING.md`; the build must work unsigned too).
+- Release checklist includes uploading the build to VirusTotal and, if flagged, submitting a false-positive report to Microsoft and the flagging vendors.
+- README "Why does Typee need a keyboard hook?" section explaining exactly what is and isn't read.
+
+### 10. Installer & auto-update (Phase 10)
+
+- Use **Velopack** (open-source .NET installer + updater) unless its docs show it can't meet these needs; if so, propose an alternative before implementing.
+- Per-user install (no admin rights), Start Menu shortcut, optional "Start with Windows".
+- Update check on startup + every 24 h against GitHub Releases of `riyadhali66/Typee`; show "Update available — install now / later"; never update silently while the user is typing.
+- Uninstall removes the Run key and shortcuts, and asks whether to keep or delete `%LOCALAPPDATA%\Typee` data.
+- GitHub Actions: on tag `v*`, build, test, package, and attach installer + SHA256 to a GitHub Release (draft).
+
+### 11. Arabic & accessibility (Phases 4, 8A, 8C, 10)
+
+- All UI strings in `.resx` resources. Ship **English and Arabic UI**; Arabic UI uses `FlowDirection=RightToLeft` for windows and menus. Setting `uiLanguage: "auto" | "en" | "ar"`.
+- Overlays, menus and the command bar fully keyboard-navigable; every control has an AutomationProperties.Name so screen readers can read Typee's own UI.
+- Respect Windows High Contrast and text-scaling settings; minimum font size follows system scale.
+- Typee's own windows are excluded from its caret tracking and hook logic.
+
+### 12. Test harness & compatibility (Phase 3 onward)
+
+- Add `tests/Typee.TestHost` — a small WPF app with: a TextBox, a RichTextBox, a multi-line TextBox with Arabic text, and a WebView2 page with a `<textarea>` and a `contenteditable` div. Use it for automated UIA-based integration tests of caret location, text context reading, selection and insertion.
+- Add `docs/TEST_MATRIX.md`: rows = apps (Notepad, Word, Outlook, Chrome, Edge, Firefox, VS Code, WhatsApp desktop, Telegram desktop, Teams, Slack, TestHost), columns = features (caret, context read, grammar, completion, insert, lists, command bar, send-to-AI, snippets, voice). Mark ✅ / ⚠️ / ❌ / not tested, updated at each checkpoint.
+- Learn compatibility locally: remember which caret method works per process name (stored in `typee.db`, process names only) to try it first next time.
+- Clipboard operations preserve the user's full clipboard (all formats where possible, not only text); if restoring fails, log it and never leave Typee text in the clipboard silently.
+
+### Placement table
+
+| Section | Phase |
+|---|---|
+| 1 Git & handoff | now |
+| 2 Crash safety | now (Phase 1) |
+| 3 Hook watchdog | Phase 2 |
+| 4 System events | Phases 2, 3, 6, 9 |
+| 5 Performance + Diagnostics window | budgets every checkpoint; window in Phase 4 |
+| 6 Credential Manager, HTTPS, rate guard | Phase 7 (profiles part in 8F) |
+| 7 Settings robustness | now (Phase 1) |
+| 8 Security | now (DLL dirs, folder perms) + Phase 10 |
+| 9 Antivirus readiness | Phase 10 |
+| 10 Installer & updates | Phase 10 |
+| 11 Arabic UI & accessibility | Phases 4, 8A, 8C, 10 |
+| 12 Test harness & matrix | Phase 3 onward |

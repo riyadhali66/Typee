@@ -2,12 +2,26 @@
 
 Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Phase 8F + ideas). Status markers: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked/deferred.
 
+## Handoff
+
+> Agents: read this first, then `git pull`, before editing.
+
+| Field | Value |
+|---|---|
+| Current branch | `main` |
+| Last completed | Phase 2 audit gaps pushed (`956ce66`); §9 Hardening spec being added |
+| Next task | Implement §9 "now" items (crash safety, settings robustness, DLL dirs, hook watchdog, Phase-2 system events) then resume Phase 3 when user says next phase |
+| Half-done | None at start of this session |
+| Uncommitted risks | None after docs commit; hardening implementation follows on `phase/hardening-now` |
+| Updated | 2026-11-08 (Cursor) |
+
 ## Phase status
 
 | Phase | Status | Commit |
 |---|---|---|
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
-| 2 — Keyboard hook + hotkeys | [~] | |
+| 1+ — Hardening now (crash/settings/DLL) | [~] | §9 |
+| 2 — Keyboard hook + hotkeys | [x] code done; soak + §9 P2 items [~] | 956ce66 |
 | 3 — Caret tracking + UIA text context | [ ] | |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
@@ -50,6 +64,20 @@ Built (pre-existing, commit cfe787e): solution with 7 projects + 3 test projects
 
 Verified: `dotnet build -c Release` 0 warnings/0 errors; `dotnet test` green. Not verified (manual): tray icon rendering, settings window visuals, second-instance activation — needs an interactive session.
 
+### §9 Hardening — Phase 1 scope (implement now)
+
+- [ ] §9.1 Handoff section (this file) + `CHANGELOG.md` + phase-branch workflow
+- [ ] §9.2 Global exception handlers → log (no user text) + tray notice + keep running when recoverable
+- [ ] §9.2 Background service supervisor (backoff 1s/5s/30s; give up after 5 failures / 10 min; tray warning)
+- [ ] §9.2 Crash marker on unclean exit; next start offer diagnostic report copy
+- [ ] §9.7 `schemaVersion: 1` + migration runner + unit tests
+- [ ] §9.7 Validate on load (hotkeys/URLs/ranges); per-field fallback + notify which fields reset
+- [ ] §9.7 `settings.backup.json`; restore if corrupt + notify
+- [ ] §9.7 Settings Export / Import (keys excluded) / Reset to defaults
+- [ ] §9.8 `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` at startup
+- [ ] §9.8 `%LOCALAPPDATA%\Typee` created with default per-user permissions only
+- [ ] §9.8 Privacy tab: Clear learned data / Delete all Typee data + storage summary (Clear/Delete may stub until Phase 5 DB)
+
 ---
 
 ## Phase 2 — Keyboard hook + hotkeys — DONE (pending manual soak)
@@ -76,6 +104,11 @@ Tasks:
 - [x] KeyboardEvent carries flags + modifiers (+ injected=false after LL filter)
 - [x] Typing debounce hot-reloads with settings
 - [ ] Gate: manual soak on a real desktop (10 min fast typing, hotkeys, pause events in logs)
+- [ ] §9.3 Hook watchdog (`GetLastInputInfo` vs last hook event every 5 s → reinstall)
+- [ ] §9.3 Debug callback duration > 1 ms logging
+- [ ] §9.4 Sleep/resume + WTS session lock/unlock → reinstall hook + re-register hotkeys
+- [ ] §9.4 Explorer restart (`TaskbarCreated`) → re-add tray icon
+- [ ] §9.4 `pauseInFullscreen` + `SHQueryUserNotificationState` (overlays/button later; setting + detection now if cheap)
 
 ### Phase 2 review notes (Z.ai draft → fixes)
 
@@ -86,6 +119,51 @@ Tasks:
 - **D7:** `TypingActivityService` raises events outside its lock (cross-thread re-entry deadlock) and unsubscribes on dispose.
 - Privacy check passed: only virtual-key codes and timestamps cross the channel; logs contain hotkey ids, counts and error codes, never keys or text.
 - Hotkey actions are placeholders that log "fired" until their feature phases (Command Bar, Smart Lists, Speech) land.
+
+## §9 Hardening — tasks by phase (from MASTER_PROMPT §9)
+
+### Now / Phase 1
+- [ ] Git handoff + CHANGELOG + phase branches
+- [ ] Crash safety (handlers, supervisor, crash marker)
+- [ ] Settings robustness (schemaVersion, migrate, validate, backup, import/export/reset)
+- [ ] Security now: SetDefaultDllDirectories; LocalAppData per-user ACLs; Privacy tab stubs
+
+### Phase 2
+- [ ] Hook watchdog + Debug >1 ms callback log
+- [ ] Sleep/resume + WTS session notifications → reinstall hook/hotkeys
+- [ ] TaskbarCreated → re-add tray
+- [ ] pauseInFullscreen setting + SHQueryUserNotificationState (full overlay pause in Phase 4)
+
+### Phase 3
+- [ ] Display-change → refresh monitor/DPI cache (overlays later)
+- [ ] `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
+- [ ] Per-process caret method memory in `typee.db` (process names only)
+- [ ] Clipboard full-format preserve/restore (with Phase 8 inserter)
+
+### Phase 4
+- [ ] Diagnostics window (tray → Diagnostics); never show user text
+- [ ] Performance budgets checked at checkpoint
+- [ ] Arabic/EN `.resx` + `uiLanguage`; a11y names; High Contrast; exclude Typee windows from caret/hook
+
+### Phase 6
+- [ ] On resume/unlock: verify harper-ls alive
+
+### Phase 7 / 8F
+- [ ] Credential Manager API keys; HTTPS remote baseUrl; rate/cost guard; Test connection
+
+### Phase 8A / 8C
+- [ ] Arabic RTL + keyboard-nav + AutomationProperties on Action Menu / Command Bar
+
+### Phase 9
+- [ ] On resume/unlock: re-open audio device
+
+### Phase 10
+- [ ] SHA256 + HTTPS for all downloads; Privacy Clear/Delete full
+- [ ] Antivirus readiness (metadata, signing docs, VirusTotal checklist, README hook FAQ)
+- [ ] Velopack installer + auto-update + GA release on `v*` tags
+- [ ] Assembly metadata complete; Authenticode steps in RELEASING.md
+
+---
 
 ## Phase 3 — Caret tracking + UIA text context — TODO
 
