@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/hardening-now` |
-| Last completed | §9 "now" hardening — crash safety, settings robustness, hook watchdog, system events |
-| Next task | Phase 2 manual soak; Phase 3 when user says next phase |
+| Current branch | `phase/hardening-now` @ `5a44a5c` (merge to `main` via GitHub UI; `gh` unauthenticated) |
+| Last completed | §9 docs + P1/P2 hardening + review fixes (HWND message windows, safer watchdog) |
+| Next task | Merge PR → Phase 2 manual soak → Phase 3 when user says next phase |
 | Half-done | Interactive desktop soak not run in CI |
 | Uncommitted risks | None |
 | Updated | 2026-11-08 (Cursor) |
