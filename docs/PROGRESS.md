@@ -65,14 +65,25 @@ Plan (files):
 - `src/Typee.App` — wire services; tray debug option "Show key activity" (typing/paused status only, never keys); re-register hotkeys on settings hot-reload.
 
 Tasks:
-- [ ] Core: HotkeyGesture parser + tests
-- [ ] Core: KeyboardEvent model, IKeyboardEvents, IHotkeyService
-- [ ] Core: TypingActivityService + tests
-- [ ] Platform: NativeMethods (hook/window/hotkey P/Invoke)
-- [ ] Platform: KeyboardHookService (thread + loop + channel + swallow flags)
-- [ ] Platform: HotkeyService (RegisterHotKey + hook-observed gestures)
-- [ ] App: DI wiring + hot-reload re-registration + key-activity debug menu
-- [ ] Gate: build/test/soak
+- [x] Core: HotkeyGesture parser + tests
+- [x] Core: KeyboardEvent model, IKeyboardEvents, IHotkeyService
+- [x] Core: TypingActivityService + tests
+- [x] Platform: NativeMethods (hook/window/hotkey P/Invoke)
+- [x] Platform: KeyboardHookService (thread + loop + channel + swallow flags)
+- [x] Platform: HotkeyService (RegisterHotKey + hook-observed gestures)
+- [x] App: DI wiring + hot-reload re-registration
+- [ ] App: tray "Show key activity" debug option — **deferred** (not in the Z.ai draft)
+- [ ] Gate: CI build/test on windows-latest (PR zai → main), then manual soak on a real desktop
+
+### Phase 2 review notes (Z.ai draft → fixes)
+
+- **D3:** `SetWindowsHookExW` takes the hook as `nint` (via `Marshal.GetFunctionPointerForDelegate`) — `LibraryImport` cannot marshal delegate parameters.
+- **D4:** Passive gestures accept side-specific modifier codes (`VK_LCONTROL`/`VK_RSHIFT`/…) — the LL hook never reports generic `VK_CONTROL`/`VK_SHIFT`/`VK_MENU`, so push-to-talk with a modifier could never fire.
+- **D5:** Hook consumer invokes each `KeyEvent` subscriber in its own try/catch (one failing consumer no longer stops key events — rule 5).
+- **D6:** `MessageWindow` captures *all* exceptions from queued actions so none unwinds into the native WndProc.
+- **D7:** `TypingActivityService` raises events outside its lock (cross-thread re-entry deadlock) and unsubscribes on dispose.
+- Privacy check passed: only virtual-key codes and timestamps cross the channel; logs contain hotkey ids, counts and error codes, never keys or text.
+- Hotkey actions are placeholders that log "fired" until their feature phases (Command Bar, Smart Lists, Speech) land.
 
 ## Phase 3 — Caret tracking + UIA text context — TODO
 

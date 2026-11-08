@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +8,8 @@ using Typee.App.Services;
 using Typee.App.SingleInstance;
 using Typee.Core;
 using Typee.Core.Abstractions;
+using Typee.Core.Typing;
+using Typee.Platform.Windows.Keyboard;
 using Typee.Storage;
 
 namespace Typee.App;
@@ -75,6 +77,15 @@ public partial class App : Application
                     services.AddSingleton<IAppPaths>(paths);
                     services.AddSingleton(paths);
                     services.AddTypeeStorage();
+                    services.AddSingleton<KeyboardInterceptionState>();
+                    services.AddSingleton<KeyboardHookService>();
+                    services.AddSingleton<IKeyboardEvents>(sp => sp.GetRequiredService<KeyboardHookService>());
+                    services.AddSingleton<IHotkeyService, HotkeyService>();
+                    services.AddSingleton<TypingActivityService>(sp => new TypingActivityService(
+                        sp.GetRequiredService<IKeyboardEvents>(),
+                        TimeProvider.System,
+                        sp.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs));
+                    services.AddSingleton<HotkeyCoordinator>();
                     services.AddSingleton<TrayIconHost>();
                 })
                 .Build();
@@ -82,9 +93,16 @@ public partial class App : Application
             var settingsStore = _host.Services.GetRequiredService<ISettingsStore>();
             await settingsStore.LoadAsync().ConfigureAwait(true);
 
+            // Input stack: hook first, then consumers, then hotkey registration.
+            _host.Services.GetRequiredService<KeyboardHookService>().Start();
+            _host.Services.GetRequiredService<TypingActivityService>()
+                .Configure(_host.Services.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs);
+            _host.Services.GetRequiredService<HotkeyCoordinator>()
+                .ApplyFromSettings(_host.Services.GetRequiredService<ISettingsStore>().Current);
+
             _trayIconHost = _host.Services.GetRequiredService<TrayIconHost>();
             var logger = _host.Services.GetRequiredService<ILogger<App>>();
-            logger.LogInformation("Typee started (Phase 1 skeleton)");
+            logger.LogInformation("Typee started");
         }
         catch (Exception ex)
         {
