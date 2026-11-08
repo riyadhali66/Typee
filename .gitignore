@@ -18,6 +18,6 @@ logs/
 # Fetched binaries and models (downloaded by tools/fetch-harper.ps1 / the Whisper model manager)
 harper-ls.exe
 src/Typee.App/runtimes/harper/
-models/
+/models/
 *.bin
 ggml-*.bin
