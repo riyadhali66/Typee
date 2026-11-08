@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using H.NotifyIcon;
+using H.NotifyIcon.Core;
 using Microsoft.Extensions.Logging;
 using Typee.App.ViewModels;
 using Typee.App.Windows;
@@ -81,6 +82,33 @@ public sealed class TrayIconHost : IDisposable
         _logger.LogInformation("Tray icon ready");
     }
 
+    public void ShowWarningBalloon(string title, string message)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _trayIcon.ShowNotification(title, message, NotificationIcon.Warning);
+        });
+    }
+
+    public void RecreateTrayIcon()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _trayIcon.ForceCreate();
+            _logger.LogInformation("Tray icon recreated");
+        });
+    }
+
     public void ShowSettings()
     {
         if (_settingsWindow is { IsLoaded: true })
@@ -97,7 +125,7 @@ public sealed class TrayIconHost : IDisposable
             return;
         }
 
-        var viewModel = new SettingsWindowViewModel(_settingsStore, _logger);
+        var viewModel = new SettingsWindowViewModel(_settingsStore, _paths, _logger);
         _settingsWindow = new SettingsWindow(viewModel);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();

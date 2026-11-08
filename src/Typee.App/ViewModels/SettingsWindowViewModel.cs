@@ -1,7 +1,11 @@
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
+using Typee.App.Services;
 using Typee.Core.Abstractions;
 using Typee.Core.Settings;
 
@@ -10,13 +14,15 @@ namespace Typee.App.ViewModels;
 public partial class SettingsWindowViewModel : ObservableObject
 {
     private readonly ISettingsStore _settingsStore;
+    private readonly IAppPaths _paths;
     private readonly ILogger _logger;
 
     private readonly Dictionary<string, (Func<string> Get, Action<string> Set)> _hotkeyEditors;
 
-    public SettingsWindowViewModel(ISettingsStore settingsStore, ILogger logger)
+    public SettingsWindowViewModel(ISettingsStore settingsStore, IAppPaths paths, ILogger logger)
     {
         _settingsStore = settingsStore;
+        _paths = paths;
         _logger = logger;
 
         _hotkeyEditors = new Dictionary<string, (Func<string>, Action<string>)>(StringComparer.Ordinal)
@@ -31,6 +37,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         };
 
         LoadFrom(settingsStore.Current);
+        RefreshLoadNotices();
     }
 
     // --- Hotkeys tab ---
@@ -116,6 +123,17 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _startWithWindows;
+
+    [ObservableProperty]
+    private bool _pauseInFullscreen = true;
+
+    [ObservableProperty]
+    private string _uiLanguage = "auto";
+
+    [ObservableProperty]
+    private string _loadNoticesText = string.Empty;
+
+    public ObservableCollection<string> UiLanguages { get; } = ["auto", "en", "ar"];
 
     // --- LLM tab ---
 
@@ -206,12 +224,121 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task ExportSettingsAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Filter = "JSON (*.json)|*.json",
+            FileName = "typee-settings.json"
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await _settingsStore.ExportAsync(dialog.FileName).ConfigureAwait(true);
+            StatusMessage = "Settings exported (no API keys in file)";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Export failed — see logs";
+            _logger.LogError(ex, "Settings export failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportSettingsAsync()
+    {
+        var dialog = new OpenFileDialog { Filter = "JSON (*.json)|*.json" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await _settingsStore.ImportAsync(dialog.FileName).ConfigureAwait(true);
+            LoadFrom(_settingsStore.Current);
+            RefreshLoadNotices();
+            StatusMessage = "Settings imported";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Import failed — see logs";
+            _logger.LogError(ex, "Settings import failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ResetSettingsAsync()
+    {
+        if (MessageBox.Show(
+                "Reset all settings to defaults?",
+                "Typee Settings",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            await _settingsStore.ResetToDefaultsAsync().ConfigureAwait(true);
+            LoadFrom(_settingsStore.Current);
+            StatusMessage = "Settings reset to defaults";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Reset failed — see logs";
+            _logger.LogError(ex, "Settings reset failed");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ClearLearnedDataAsync()
+    {
+        if (MessageBox.Show(
+                "Clear learned data by resetting settings and removing logs?\n\n"
+                + "SQLite learned data (Phase 5) is not deleted yet.",
+                "Typee — Clear learned data",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await ClearLocalUserDataAsync(includeSettings: true).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task DeleteAllDataAsync()
+    {
+        if (MessageBox.Show(
+                "Delete all Typee data under %LOCALAPPDATA%\\Typee (settings, logs, crash marker)?\n\n"
+                + "Database wipe arrives in Phase 5.",
+                "Typee — Delete all data",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await ClearLocalUserDataAsync(includeSettings: true).ConfigureAwait(true);
+        await _settingsStore.ResetToDefaultsAsync().ConfigureAwait(true);
+        LoadFrom(_settingsStore.Current);
+        StatusMessage = "Local data cleared";
+    }
+
+    [RelayCommand]
     private async Task ReloadAsync()
     {
         try
         {
             var settings = await _settingsStore.LoadAsync().ConfigureAwait(true);
             LoadFrom(settings);
+            RefreshLoadNotices();
             StatusMessage = "Reloaded from disk";
         }
         catch (Exception ex)
@@ -257,6 +384,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         TranslateTargetsText = string.Join(", ", settings.TranslateTargets);
         BlockedProcessesText = string.Join(Environment.NewLine, settings.BlockedProcesses);
         StartWithWindows = settings.StartWithWindows;
+        PauseInFullscreen = settings.PauseInFullscreen;
+        UiLanguage = settings.UiLanguage;
     }
 
     private void ApplyTo(AppSettings settings)
@@ -295,6 +424,53 @@ public partial class SettingsWindowViewModel : ObservableObject
         settings.TranslateTargets = SplitList(TranslateTargetsText, ',');
         settings.BlockedProcesses = SplitList(BlockedProcessesText, '\n', '\r', ',');
         settings.StartWithWindows = StartWithWindows;
+        settings.PauseInFullscreen = PauseInFullscreen;
+        settings.UiLanguage = UiLanguage.Trim();
+        settings.SchemaVersion = SettingsMigrator.CurrentSchemaVersion;
+    }
+
+    private void RefreshLoadNotices()
+    {
+        var notices = _settingsStore.LastLoadNotices;
+        LoadNoticesText = notices.Count == 0
+            ? string.Empty
+            : string.Join(Environment.NewLine, notices);
+    }
+
+    private async Task ClearLocalUserDataAsync(bool includeSettings)
+    {
+        try
+        {
+            if (includeSettings && File.Exists(_paths.SettingsFilePath))
+            {
+                File.Delete(_paths.SettingsFilePath);
+            }
+
+            if (File.Exists(_paths.SettingsBackupFilePath))
+            {
+                File.Delete(_paths.SettingsBackupFilePath);
+            }
+
+            CrashDiagnostics.ClearMarker(_paths);
+
+            if (Directory.Exists(_paths.LogsDirectory))
+            {
+                foreach (var file in Directory.EnumerateFiles(_paths.LogsDirectory))
+                {
+                    File.Delete(file);
+                }
+            }
+
+            _logger.LogInformation("Cleared local user data (settings/logs/marker)");
+            await _settingsStore.LoadAsync().ConfigureAwait(true);
+            LoadFrom(_settingsStore.Current);
+            StatusMessage = "Local data cleared";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Clear failed — see logs";
+            _logger.LogError(ex, "Failed to clear local user data");
+        }
     }
 
     private static List<string> SplitList(string text, params char[] separators)

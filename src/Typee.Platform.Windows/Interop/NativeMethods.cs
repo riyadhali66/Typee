@@ -18,6 +18,18 @@ internal static partial class NativeMethods
     public const int WmClose = 0x0010;
     public const int WmQuit = 0x0012;
     public const int WmAppRunQueue = 0x8000;   // WM_APP: drain the action queue
+    public const int WmAppReinstallHook = 0x8001;
+
+    public const int WmWtsSessionChange = 0x02B1;
+    public const int WtsSessionUnlock = 0x8;
+    public const int WtsSessionLogon = 0x5;
+    public const int NotifyForThisSession = 0;
+
+    public const int WmPowerBroadcast = 0x218;
+    public const int PbtApmResumeAutomatic = 0x12;
+    public const int PbtApmResumeSuspend = 0x7;
+
+    public const uint LoadLibrarySearchDefaultDirs = 0x1000;
     public const int LlkhfInjected = 0x10;
     public const int ErrorHotkeyAlreadyRegistered = 1409;
     public const nint HwndMessage = -3;
@@ -98,6 +110,25 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     internal static partial uint GetCurrentThreadId();
 
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetDefaultDllDirectories(uint directoryFlags);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetLastInputInfo(ref LastInputInfo plii);
+
+    [LibraryImport("user32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial uint RegisterWindowMessageW(string lpString);
+
+    [LibraryImport("wtsapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool WTSRegisterSessionNotification(nint hWnd, uint dwFlags);
+
+    [LibraryImport("wtsapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool WTSUnRegisterSessionNotification(nint hWnd);
+
     /// <summary>High bit set means the key is currently down. Used only to snapshot modifiers in the LL hook.</summary>
     [LibraryImport("user32.dll", SetLastError = false)]
     internal static partial short GetAsyncKeyState(int vKey);
@@ -134,6 +165,13 @@ internal static partial class NativeMethods
         public uint Time;
         public int PointX;
         public int PointY;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct LastInputInfo
+    {
+        public uint CbSize;
+        public uint DwTime;
     }
 
     [StructLayout(LayoutKind.Sequential)]

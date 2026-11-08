@@ -4,6 +4,8 @@ public interface IAppPaths
 {
     string RootDirectory { get; }
     string SettingsFilePath { get; }
+    string SettingsBackupFilePath { get; }
+    string CrashMarkerFilePath { get; }
     string LogsDirectory { get; }
     string DatabaseFilePath { get; }
     string ModelsDirectory { get; }

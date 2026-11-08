@@ -52,6 +52,17 @@
       <TabItem Header="General">
         <ScrollViewer Style="{StaticResource TabScroll}">
           <StackPanel>
+            <TextBlock Text="Application" Style="{StaticResource SectionHeader}"/>
+            <CheckBox Content="Pause overlays in fullscreen (detection wired in a later phase)" IsChecked="{Binding PauseInFullscreen}"/>
+            <TextBlock Text="UI language" Style="{StaticResource FieldLabel}"/>
+            <ComboBox ItemsSource="{Binding UiLanguages}" SelectedItem="{Binding UiLanguage}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+              <Button Content="Export…" Width="90" Margin="0,0,8,0" Command="{Binding ExportSettingsCommand}"/>
+              <Button Content="Import…" Width="90" Margin="0,0,8,0" Command="{Binding ImportSettingsCommand}"/>
+              <Button Content="Reset defaults" Command="{Binding ResetSettingsCommand}"/>
+            </StackPanel>
+            <TextBlock Text="{Binding LoadNoticesText}" TextWrapping="Wrap" Foreground="#FF666666" Margin="0,0,0,8"/>
+
             <TextBlock Text="Suggestions" Style="{StaticResource SectionHeader}"/>
             <CheckBox Content="Suggestions enabled" IsChecked="{Binding SuggestionsEnabled}"/>
             <TextBlock Text="Debounce (ms)" Style="{StaticResource FieldLabel}"/>
@@ -150,6 +161,20 @@
               <TextBox Grid.Row="13" Text="{Binding DismissHotkey, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="True"/>
               <Button Grid.Row="13" Grid.Column="1" Content="Capture" Margin="8,0,0,8" Width="80" Click="CaptureDismiss_OnClick"/>
             </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Privacy &amp; data">
+        <ScrollViewer Style="{StaticResource TabScroll}">
+          <StackPanel>
+            <TextBlock Text="What Typee stores locally" Style="{StaticResource SectionHeader}"/>
+            <TextBlock TextWrapping="Wrap" Foreground="#FF555555" Margin="0,0,0,12"
+                       Text="settings.json and settings.backup.json (preferences only — API keys stay in environment variables), rolling logs under logs\ (counts and errors, never typed text), and crash.marker while running. SQLite learning data (Phase 5) will live in typee.db."/>
+            <Button Content="Clear learned data…" HorizontalAlignment="Left" Margin="0,0,0,8" Command="{Binding ClearLearnedDataCommand}"/>
+            <Button Content="Delete all Typee data…" HorizontalAlignment="Left" Command="{Binding DeleteAllDataCommand}"/>
+            <TextBlock TextWrapping="Wrap" Foreground="#FF888888" Margin="0,12,0,0"
+                       Text="These actions currently remove settings, logs, and the crash marker. Database wipe is deferred to Phase 5."/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

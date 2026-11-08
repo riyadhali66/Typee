@@ -2,6 +2,10 @@ namespace Typee.Core.Settings;
 
 public sealed class AppSettings
 {
+    public int SchemaVersion { get; set; } = 1;
+    public bool PauseInFullscreen { get; set; } = true;
+    public string UiLanguage { get; set; } = "auto";
+
     public HotkeySettings Hotkeys { get; set; } = new();
     public SuggestionSettings Suggestions { get; set; } = new();
     public GrammarSettings Grammar { get; set; } = new();

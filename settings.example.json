@@ -1,4 +1,7 @@
 {
+  "schemaVersion": 1,
+  "pauseInFullscreen": true,
+  "uiLanguage": "auto",
   "hotkeys": {
     "commandBar": "Ctrl+Shift+Space",
     "sendToLastAi": "Ctrl+Alt+Enter",

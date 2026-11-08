@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Channels;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -31,13 +32,22 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     private nint _hookHandle;
     private uint _hookThreadId;
     private long _droppedEvents;
+    private int _lastSeenEventTick = Environment.TickCount;
+    private int _previousSystemInputTick;
+    private Timer? _watchdogTimer;
+    private volatile bool _disposing;
     private CancellationTokenSource? _consumerCts;
     private Task? _consumerTask;
+
+    public event EventHandler? HookStoppedUnexpectedly;
 
     private static readonly HookProc HookProcDelegate = HookProcCallback;
 
     private static unsafe nint HookProcCallback(int code, nint wParam, nint lParam)
     {
+#if DEBUG
+        var sw = Stopwatch.StartNew();
+#endif
         if (code < 0)
         {
             return CallNextHookEx(0, code, wParam, lParam);
@@ -85,6 +95,8 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
                 modifiers |= KeyModifiers.Win;
             }
 
+            Interlocked.Exchange(ref _current._lastSeenEventTick, data.Time != 0 ? data.Time : Environment.TickCount);
+
             if (!_current._channel.Writer.TryWrite(
                     new KeyboardEvent(data.VkCode, isKeyDown, data.Flags, modifiers, (uint)data.Time, IsInjected: false)))
             {
@@ -92,6 +104,13 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             }
         }
 
+#if DEBUG
+        sw.Stop();
+        if (sw.ElapsedMilliseconds > 1 && _current is not null)
+        {
+            _current._logger.LogWarning("Keyboard hook callback exceeded 1 ms ({ElapsedMicros} µs)", sw.Elapsed.TotalMicroseconds);
+        }
+#endif
         return CallNextHookEx(0, code, wParam, lParam);
     }
 
@@ -110,9 +129,16 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     {
         lock (_gate)
         {
-            if (_thread is { IsAlive: true })
+            if (_thread is { IsAlive: true } && _hookHandle != 0)
             {
                 return;
+            }
+
+            if (_thread is not null && !_thread.IsAlive)
+            {
+                _thread = null;
+                _hookHandle = 0;
+                _hookThreadId = 0;
             }
 
             var ready = new ManualResetEventSlim(false);
@@ -121,8 +147,25 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             ready.Wait(TimeSpan.FromSeconds(5));
         }
 
-        _consumerCts = new CancellationTokenSource();
-        _consumerTask = Task.Run(() => ConsumeAsync(_consumerCts.Token));
+        _consumerCts ??= new CancellationTokenSource();
+        _consumerTask ??= Task.Run(() => ConsumeAsync(_consumerCts.Token));
+
+        _watchdogTimer ??= new Timer(WatchdogTick, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    public void Reinstall()
+    {
+        if (_hookThreadId == 0)
+        {
+            Start();
+            return;
+        }
+
+        if (!PostThreadMessageW(_hookThreadId, WmAppReinstallHook, 0, 0))
+        {
+            _logger.LogWarning("PostThreadMessage(reinstall) failed with {Error}; restarting hook thread", Marshal.GetLastWin32Error());
+            RestartHookThread();
+        }
     }
 
     private void HookThreadProc(object? state)
@@ -144,10 +187,18 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             return;
         }
 
+        Interlocked.Exchange(ref _lastSeenEventTick, Environment.TickCount);
+
         try
         {
             while (GetMessageW(out var msg, 0, 0, 0) > 0)
             {
+                if (msg.Message == WmAppReinstallHook)
+                {
+                    ReinstallHookInternal();
+                    continue;
+                }
+
                 _ = TranslateMessage(msg);
                 _ = DispatchMessageW(msg);
             }
@@ -165,6 +216,78 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             }
 
             _logger.LogInformation("Keyboard hook thread exited");
+            if (!_disposing)
+            {
+                HookStoppedUnexpectedly?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    private void ReinstallHookInternal()
+    {
+        if (_hookHandle != 0)
+        {
+            _ = UnhookWindowsHookEx(_hookHandle);
+            _hookHandle = 0;
+        }
+
+        var moduleHandle = GetModuleHandleW(null);
+        _hookHandle = SetWindowsHookExW(WhKeyboardLl, Marshal.GetFunctionPointerForDelegate(HookProcDelegate), moduleHandle, 0);
+        if (_hookHandle == 0)
+        {
+            _logger.LogError("Reinstall SetWindowsHookEx failed with {Error}", Marshal.GetLastWin32Error());
+        }
+        else
+        {
+            _logger.LogWarning("Keyboard hook reinstalled");
+            Interlocked.Exchange(ref _lastSeenEventTick, Environment.TickCount);
+        }
+    }
+
+    private void RestartHookThread()
+    {
+        lock (_gate)
+        {
+            if (_thread is { IsAlive: true } && _hookThreadId != 0)
+            {
+                _ = PostThreadMessageW(_hookThreadId, WmQuit, 0, 0);
+                _thread.Join(TimeSpan.FromSeconds(2));
+            }
+
+            _thread = null;
+            _hookHandle = 0;
+            _hookThreadId = 0;
+        }
+
+        Start();
+    }
+
+    private void WatchdogTick(object? _)
+    {
+        if (_disposing || _hookHandle == 0)
+        {
+            return;
+        }
+
+        var info = new LastInputInfo { CbSize = (uint)Marshal.SizeOf<LastInputInfo>() };
+        if (!GetLastInputInfo(ref info))
+        {
+            return;
+        }
+
+        var systemTick = (int)info.DwTime;
+        if (systemTick == _previousSystemInputTick)
+        {
+            return;
+        }
+
+        _previousSystemInputTick = systemTick;
+        var hookTick = Volatile.Read(ref _lastSeenEventTick);
+        var lagMs = unchecked(systemTick - hookTick);
+        if (lagMs > 2000)
+        {
+            _logger.LogWarning("Hook watchdog detected {LagMs} ms input lag — reinstalling hook", lagMs);
+            Reinstall();
         }
     }
 
@@ -203,6 +326,10 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
 
     public void Dispose()
     {
+        _disposing = true;
+        _watchdogTimer?.Dispose();
+        _watchdogTimer = null;
+
         lock (_gate)
         {
             if (_thread is { IsAlive: true } && _hookThreadId != 0)

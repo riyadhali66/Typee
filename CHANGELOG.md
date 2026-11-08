@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Hardening & Release Readiness spec (`docs/MASTER_PROMPT.md` §9): crash safety, hook watchdog, system events, settings robustness, Credential Manager keys, Velopack installer plan, Arabic/a11y, test harness.
+- §9 hardening (now): crash marker + diagnostic clipboard offer; global exception handlers with tray notifications; `ServiceSupervisor` with 1s/5s/30s backoff for the keyboard hook.
+- Settings `schemaVersion` 1, migrator/validator, `settings.backup.json`, import/export/reset; Privacy tab (clear local data; DB wipe Phase 5).
+- `SetDefaultDllDirectories` at app startup; hook watchdog (`GetLastInputInfo`); system resume + `TaskbarCreated` handling.
+- Hardening & Release Readiness spec (`docs/MASTER_PROMPT.md` §9): Credential Manager keys, Velopack installer plan, Arabic/a11y, test harness (deferred).
 - Agent handoff section in `docs/PROGRESS.md`.
 
 ### Changed

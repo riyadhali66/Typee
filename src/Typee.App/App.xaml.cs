@@ -1,16 +1,22 @@
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Typee.App.Interop;
 using Typee.App.Services;
 using Typee.App.SingleInstance;
 using Typee.Core;
 using Typee.Core.Abstractions;
+using Typee.Core.Reliability;
 using Typee.Core.Typing;
 using Typee.Platform.Windows.Keyboard;
+using Typee.Platform.Windows.SystemEvents;
 using Typee.Storage;
+using static Typee.App.Interop.NativeMethods;
 
 namespace Typee.App;
 
@@ -19,14 +25,23 @@ public partial class App : Application
     private IHost? _host;
     private SingleInstanceGuard? _singleInstance;
     private TrayIconHost? _trayIconHost;
+    private ServiceSupervisor? _hookSupervisor;
+    private SystemEventMonitor? _systemEventMonitor;
+    private static TrayIconHost? _trayForErrors;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        if (!SetDefaultDllDirectories(LoadLibrarySearchDefaultDirs))
+        {
+            _ = Marshal.GetLastWin32Error();
+        }
+
         base.OnStartup(e);
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var paths = new TypeePaths();
         paths.EnsureCreated();
+        CrashDiagnostics.OfferDiagnosticReportIfNeeded(paths);
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
@@ -38,23 +53,9 @@ public partial class App : Application
                 shared: true)
             .CreateLogger();
 
-        DispatcherUnhandledException += (_, args) =>
-        {
-            Log.Fatal(args.Exception, "Unhandled dispatcher exception");
-            args.Handled = true;
-        };
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-        {
-            if (args.ExceptionObject is Exception ex)
-            {
-                Log.Fatal(ex, "Unhandled domain exception");
-            }
-        };
-        TaskScheduler.UnobservedTaskException += (_, args) =>
-        {
-            Log.Fatal(args.Exception, "Unobserved task exception");
-            args.SetObserved();
-        };
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         _singleInstance = SingleInstanceGuard.Acquire(OnActivateSettingsRequested);
         if (!_singleInstance.IsPrimaryInstance)
@@ -68,8 +69,6 @@ public partial class App : Application
 
         try
         {
-            // UseSerilog + DI composition root. Do not StartAsync the default console
-            // lifetime — it tears down (and disposes WPF tray objects) when no console is attached.
             _host = Host.CreateDefaultBuilder()
                 .UseSerilog()
                 .ConfigureServices(services =>
@@ -87,20 +86,48 @@ public partial class App : Application
                         sp.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs));
                     services.AddSingleton<HotkeyCoordinator>();
                     services.AddSingleton<TrayIconHost>();
+                    services.AddSingleton<SystemEventMonitor>();
                 })
                 .Build();
 
             var settingsStore = _host.Services.GetRequiredService<ISettingsStore>();
             await settingsStore.LoadAsync().ConfigureAwait(true);
 
-            // Input stack: hook first, then consumers, then hotkey registration.
-            _host.Services.GetRequiredService<KeyboardHookService>().Start();
+            var keyboardHook = _host.Services.GetRequiredService<KeyboardHookService>();
+            var loggerFactory = _host.Services.GetRequiredService<ILoggerFactory>();
+            var appLogger = loggerFactory.CreateLogger<App>();
+
+            _hookSupervisor = new ServiceSupervisor(
+                "keyboard-hook",
+                start: () => keyboardHook.Start(),
+                stop: () => keyboardHook.Reinstall(),
+                appLogger);
+            keyboardHook.HookStoppedUnexpectedly += (_, _) =>
+                _hookSupervisor.NotifyStoppedUnexpectedly("hook thread exited");
+            _hookSupervisor.GiveUp += (_, args) =>
+                _trayForErrors?.ShowWarningBalloon(
+                    "Typee degraded",
+                    $"Keyboard input ({args.FeatureName}) stopped after repeated failures.");
+            _hookSupervisor.Restarting += (_, args) =>
+                _trayForErrors?.ShowWarningBalloon(
+                    "Typee",
+                    $"Restarting {args.FeatureName}…");
+            _hookSupervisor.StartInitial();
+
             _host.Services.GetRequiredService<TypingActivityService>()
                 .Configure(_host.Services.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs);
             _host.Services.GetRequiredService<HotkeyCoordinator>()
                 .ApplyFromSettings(_host.Services.GetRequiredService<ISettingsStore>().Current);
 
             _trayIconHost = _host.Services.GetRequiredService<TrayIconHost>();
+            _trayForErrors = _trayIconHost;
+
+            _systemEventMonitor = _host.Services.GetRequiredService<SystemEventMonitor>();
+            _systemEventMonitor.SystemResumed += OnSystemResumed;
+            _systemEventMonitor.TaskbarCreated += OnTaskbarCreated;
+
+            CrashDiagnostics.WriteRunningMarker(paths);
+
             var logger = _host.Services.GetRequiredService<ILogger<App>>();
             logger.LogInformation("Typee started");
         }
@@ -118,6 +145,12 @@ public partial class App : Application
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        _systemEventMonitor?.Dispose();
+        _systemEventMonitor = null;
+        _hookSupervisor?.Dispose();
+        _hookSupervisor = null;
+
+        _trayForErrors = null;
         _trayIconHost?.Dispose();
         _trayIconHost = null;
         _singleInstance?.Dispose();
@@ -125,7 +158,11 @@ public partial class App : Application
 
         if (_host is not null)
         {
-            // Dispose DI graph after tray is already torn down on the UI thread.
+            if (_host.Services.GetService<IAppPaths>() is { } paths)
+            {
+                CrashDiagnostics.ClearMarker(paths);
+            }
+
             if (_host is IAsyncDisposable asyncDisposable)
             {
                 await asyncDisposable.DisposeAsync().ConfigureAwait(true);
@@ -140,6 +177,54 @@ public partial class App : Application
 
         await Log.CloseAndFlushAsync().ConfigureAwait(true);
         base.OnExit(e);
+    }
+
+    private void OnSystemResumed(object? sender, EventArgs e)
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                _host.Services.GetRequiredService<HotkeyCoordinator>().OnSystemResumed();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to handle system resume");
+            }
+        });
+    }
+
+    private void OnTaskbarCreated(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(() => _trayIconHost?.RecreateTrayIcon());
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
+    {
+        Log.Fatal(args.Exception, "Unhandled dispatcher exception");
+        _trayForErrors?.ShowWarningBalloon("Typee error", "A recoverable error occurred. Typee will keep running.");
+        args.Handled = true;
+    }
+
+    private void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs args)
+    {
+        if (args.ExceptionObject is Exception ex)
+        {
+            Log.Fatal(ex, "Unhandled domain exception (terminating={IsTerminating})", args.IsTerminating);
+            _trayForErrors?.ShowWarningBalloon("Typee error", "A serious error occurred.");
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs args)
+    {
+        Log.Fatal(args.Exception, "Unobserved task exception");
+        _trayForErrors?.ShowWarningBalloon("Typee error", "A background task failed.");
+        args.SetObserved();
     }
 
     private void OnActivateSettingsRequested()

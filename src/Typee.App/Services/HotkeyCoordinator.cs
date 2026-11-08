@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
 using Typee.Core.Settings;
 using Typee.Core.Typing;
+using Typee.Platform.Windows.Keyboard;
 
 namespace Typee.App.Services;
 
@@ -15,6 +16,7 @@ public sealed class HotkeyCoordinator : IDisposable
     private readonly IHotkeyService _hotkeyService;
     private readonly ISettingsStore _settingsStore;
     private readonly TypingActivityService _typingActivity;
+    private readonly KeyboardHookService _keyboardHook;
     private readonly ILogger<HotkeyCoordinator> _logger;
     private bool _disposed;
 
@@ -22,14 +24,30 @@ public sealed class HotkeyCoordinator : IDisposable
         IHotkeyService hotkeyService,
         ISettingsStore settingsStore,
         TypingActivityService typingActivity,
+        KeyboardHookService keyboardHook,
         ILogger<HotkeyCoordinator> logger)
     {
         _hotkeyService = hotkeyService;
         _settingsStore = settingsStore;
         _typingActivity = typingActivity;
+        _keyboardHook = keyboardHook;
         _logger = logger;
         _settingsStore.SettingsChanged += OnSettingsChanged;
         _hotkeyService.RegistrationFailed += OnRegistrationFailed;
+    }
+
+    public void OnSystemResumed()
+    {
+        try
+        {
+            _keyboardHook.Reinstall();
+            ApplyFromSettings(_settingsStore.Current);
+            _logger.LogInformation("Reinstalled keyboard hook and hotkeys after system resume");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to recover input stack after system resume");
+        }
     }
 
     public void ApplyFromSettings(AppSettings settings)

@@ -40,6 +40,27 @@ public sealed class JsonSettingsStoreTests
     }
 
     [Fact]
+    public async Task SaveAsync_WritesBackupCopy()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "TypeeTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var paths = new TestPaths(root);
+            using var store = new JsonSettingsStore(paths, NullLogger<JsonSettingsStore>.Instance);
+            await store.SaveAsync(AppSettings.CreateDefault());
+            Assert.True(File.Exists(paths.SettingsBackupFilePath));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_CreatesDefaultsWhenMissing()
     {
         var root = Path.Combine(Path.GetTempPath(), "TypeeTests", Guid.NewGuid().ToString("N"));
@@ -70,6 +91,8 @@ public sealed class JsonSettingsStoreTests
         {
             RootDirectory = root;
             SettingsFilePath = Path.Combine(root, "settings.json");
+            SettingsBackupFilePath = Path.Combine(root, "settings.backup.json");
+            CrashMarkerFilePath = Path.Combine(root, "crash.marker");
             LogsDirectory = Path.Combine(root, "logs");
             DatabaseFilePath = Path.Combine(root, "typee.db");
             ModelsDirectory = Path.Combine(root, "models");
@@ -77,6 +100,8 @@ public sealed class JsonSettingsStoreTests
 
         public string RootDirectory { get; }
         public string SettingsFilePath { get; }
+        public string SettingsBackupFilePath { get; }
+        public string CrashMarkerFilePath { get; }
         public string LogsDirectory { get; }
         public string DatabaseFilePath { get; }
         public string ModelsDirectory { get; }

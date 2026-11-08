@@ -8,11 +8,11 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `main` |
-| Last completed | Phase 2 audit gaps pushed (`956ce66`); §9 Hardening spec being added |
-| Next task | Implement §9 "now" items (crash safety, settings robustness, DLL dirs, hook watchdog, Phase-2 system events) then resume Phase 3 when user says next phase |
-| Half-done | None at start of this session |
-| Uncommitted risks | None after docs commit; hardening implementation follows on `phase/hardening-now` |
+| Current branch | `phase/hardening-now` |
+| Last completed | §9 "now" hardening — crash safety, settings robustness, hook watchdog, system events |
+| Next task | Phase 2 manual soak; Phase 3 when user says next phase |
+| Half-done | Interactive desktop soak not run in CI |
+| Uncommitted risks | None |
 | Updated | 2026-11-08 (Cursor) |
 
 ## Phase status
@@ -20,8 +20,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | Phase | Status | Commit |
 |---|---|---|
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
-| 1+ — Hardening now (crash/settings/DLL) | [~] | §9 |
-| 2 — Keyboard hook + hotkeys | [x] code done; soak + §9 P2 items [~] | 956ce66 |
+| 1+ — Hardening now (crash/settings/DLL) | [x] | §9 now |
+| 2 — Keyboard hook + hotkeys | [x] code + §9 P2 watchdog/events; soak [ ] | 956ce66 |
 | 3 — Caret tracking + UIA text context | [ ] | |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
@@ -66,17 +66,17 @@ Verified: `dotnet build -c Release` 0 warnings/0 errors; `dotnet test` green. No
 
 ### §9 Hardening — Phase 1 scope (implement now)
 
-- [ ] §9.1 Handoff section (this file) + `CHANGELOG.md` + phase-branch workflow
-- [ ] §9.2 Global exception handlers → log (no user text) + tray notice + keep running when recoverable
-- [ ] §9.2 Background service supervisor (backoff 1s/5s/30s; give up after 5 failures / 10 min; tray warning)
-- [ ] §9.2 Crash marker on unclean exit; next start offer diagnostic report copy
-- [ ] §9.7 `schemaVersion: 1` + migration runner + unit tests
-- [ ] §9.7 Validate on load (hotkeys/URLs/ranges); per-field fallback + notify which fields reset
-- [ ] §9.7 `settings.backup.json`; restore if corrupt + notify
-- [ ] §9.7 Settings Export / Import (keys excluded) / Reset to defaults
-- [ ] §9.8 `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` at startup
-- [ ] §9.8 `%LOCALAPPDATA%\Typee` created with default per-user permissions only
-- [ ] §9.8 Privacy tab: Clear learned data / Delete all Typee data + storage summary (Clear/Delete may stub until Phase 5 DB)
+- [x] §9.1 Handoff section (this file) + `CHANGELOG.md` + phase-branch workflow
+- [x] §9.2 Global exception handlers → log (no user text) + tray notice + keep running when recoverable
+- [x] §9.2 Background service supervisor (backoff 1s/5s/30s; give up after 5 failures / 10 min; tray warning)
+- [x] §9.2 Crash marker on unclean exit; next start offer diagnostic report copy
+- [x] §9.7 `schemaVersion: 1` + migration runner + unit tests
+- [x] §9.7 Validate on load (hotkeys/URLs/ranges); per-field fallback + notify which fields reset
+- [x] §9.7 `settings.backup.json`; restore if corrupt + notify
+- [x] §9.7 Settings Export / Import (keys excluded) / Reset to defaults
+- [x] §9.8 `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` at startup
+- [x] §9.8 `%LOCALAPPDATA%\Typee` created with default per-user permissions only
+- [x] §9.8 Privacy tab: Clear learned data / Delete all Typee data + storage summary (DB wipe deferred Phase 5)
 
 ---
 
@@ -104,11 +104,11 @@ Tasks:
 - [x] KeyboardEvent carries flags + modifiers (+ injected=false after LL filter)
 - [x] Typing debounce hot-reloads with settings
 - [ ] Gate: manual soak on a real desktop (10 min fast typing, hotkeys, pause events in logs)
-- [ ] §9.3 Hook watchdog (`GetLastInputInfo` vs last hook event every 5 s → reinstall)
-- [ ] §9.3 Debug callback duration > 1 ms logging
-- [ ] §9.4 Sleep/resume + WTS session lock/unlock → reinstall hook + re-register hotkeys
-- [ ] §9.4 Explorer restart (`TaskbarCreated`) → re-add tray icon
-- [ ] §9.4 `pauseInFullscreen` + `SHQueryUserNotificationState` (overlays/button later; setting + detection now if cheap)
+- [x] §9.3 Hook watchdog (`GetLastInputInfo` vs last hook event every 5 s → reinstall)
+- [x] §9.3 Debug callback duration > 1 ms logging
+- [x] §9.4 Sleep/resume + WTS session lock/unlock → reinstall hook + re-register hotkeys
+- [x] §9.4 Explorer restart (`TaskbarCreated`) → re-add tray icon
+- [~] §9.4 `pauseInFullscreen` setting only; `SHQueryUserNotificationState` deferred (overlays later)
 
 ### Phase 2 review notes (Z.ai draft → fixes)
 
@@ -117,16 +117,17 @@ Tasks:
 - **D5:** Hook consumer invokes each `KeyEvent` subscriber in its own try/catch (one failing consumer no longer stops key events — rule 5).
 - **D6:** `MessageWindow` captures *all* exceptions from queued actions so none unwinds into the native WndProc.
 - **D7:** `TypingActivityService` raises events outside its lock (cross-thread re-entry deadlock) and unsubscribes on dispose.
+- **D8 (§9 hook watchdog):** `GetLastInputInfo` includes mouse movement — watchdog may false-positive reinstall when the user moves the mouse without keyboard input; accepted for now; tune lag threshold or keyboard-only signal in a follow-up if soak shows noise.
 - Privacy check passed: only virtual-key codes and timestamps cross the channel; logs contain hotkey ids, counts and error codes, never keys or text.
 - Hotkey actions are placeholders that log "fired" until their feature phases (Command Bar, Smart Lists, Speech) land.
 
 ## §9 Hardening — tasks by phase (from MASTER_PROMPT §9)
 
 ### Now / Phase 1
-- [ ] Git handoff + CHANGELOG + phase branches
-- [ ] Crash safety (handlers, supervisor, crash marker)
-- [ ] Settings robustness (schemaVersion, migrate, validate, backup, import/export/reset)
-- [ ] Security now: SetDefaultDllDirectories; LocalAppData per-user ACLs; Privacy tab stubs
+- [x] Git handoff + CHANGELOG + phase branches
+- [x] Crash safety (handlers, supervisor, crash marker)
+- [x] Settings robustness (schemaVersion, migrate, validate, backup, import/export/reset)
+- [x] Security now: SetDefaultDllDirectories; LocalAppData per-user ACLs; Privacy tab (settings/logs/marker only until Phase 5 DB)
 
 ### Phase 2
 - [ ] Hook watchdog + Debug >1 ms callback log

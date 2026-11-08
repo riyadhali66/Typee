@@ -23,6 +23,7 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
     private readonly object _gate = new();
     private readonly FileSystemWatcher _watcher;
     private AppSettings _current = AppSettings.CreateDefault();
+    private List<string> _lastLoadNotices = [];
     private bool _suppressWatcher;
     private bool _disposed;
 
@@ -46,6 +47,17 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
 
     public string SettingsPath { get; }
 
+    public IReadOnlyList<string> LastLoadNotices
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _lastLoadNotices.ToList();
+            }
+        }
+    }
+
     public AppSettings Current
     {
         get
@@ -61,28 +73,64 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken = default)
     {
+        var notices = new List<string>();
+
         if (!File.Exists(SettingsPath))
         {
-            var defaults = AppSettings.CreateDefault();
-            await SaveAsync(defaults, cancellationToken).ConfigureAwait(false);
-            return defaults;
+            if (!TryRestoreFromBackup(notices))
+            {
+                var defaults = AppSettings.CreateDefault();
+                await SaveAsync(defaults, cancellationToken).ConfigureAwait(false);
+                ApplyNotices(notices);
+                return defaults;
+            }
         }
 
-        await using var stream = new FileStream(
-            SettingsPath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite | FileShare.Delete);
-        var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(stream, SerializerOptions, cancellationToken)
-            .ConfigureAwait(false) ?? AppSettings.CreateDefault();
+        AppSettings loaded;
+        try
+        {
+            loaded = await ReadSettingsFileAsync(SettingsPath, cancellationToken).ConfigureAwait(false)
+                     ?? AppSettings.CreateDefault();
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "settings.json unreadable; attempting backup restore");
+            if (!TryRestoreFromBackup(notices))
+            {
+                loaded = AppSettings.CreateDefault();
+                notices.Add("settings.json was corrupt and no backup was available — using defaults.");
+            }
+            else
+            {
+                loaded = await ReadSettingsFileAsync(SettingsPath, cancellationToken).ConfigureAwait(false)
+                         ?? AppSettings.CreateDefault();
+            }
+        }
 
-        Normalize(loaded);
+        NormalizeNulls(loaded);
+        var migrated = SettingsMigrator.Migrate(loaded);
+        if (migrated)
+        {
+            notices.Add($"Migrated settings to schema version {SettingsMigrator.CurrentSchemaVersion}.");
+        }
+
+        var resetFields = SettingsValidator.ValidateAndRepair(loaded);
+        foreach (var field in resetFields)
+        {
+            notices.Add($"Reset invalid field '{field}' to its default.");
+        }
 
         lock (_gate)
         {
             _current = loaded;
         }
 
+        if (migrated || resetFields.Count > 0)
+        {
+            await SaveAsync(loaded, cancellationToken).ConfigureAwait(false);
+        }
+
+        ApplyNotices(notices);
         _logger.LogInformation("Loaded settings from {SettingsPath}", SettingsPath);
         return Clone(loaded);
     }
@@ -90,7 +138,8 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        Normalize(settings);
+        NormalizeNulls(settings);
+        SettingsValidator.ValidateAndRepair(settings);
 
         Directory.CreateDirectory(_paths.RootDirectory);
         var temporaryPath = SettingsPath + ".tmp";
@@ -109,6 +158,7 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
         try
         {
             File.Copy(temporaryPath, SettingsPath, overwrite: true);
+            File.Copy(SettingsPath, _paths.SettingsBackupFilePath, overwrite: true);
             File.Delete(temporaryPath);
         }
         finally
@@ -124,6 +174,38 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
 
         _logger.LogInformation("Saved settings to {SettingsPath}", SettingsPath);
         SettingsChanged?.Invoke(this, Clone(settings));
+    }
+
+    /// <summary>Exports settings JSON (no secrets are stored in settings.json).</summary>
+    public async Task ExportAsync(string destinationPath, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+        var json = JsonSerializer.Serialize(Current, SerializerOptions);
+        await File.WriteAllTextAsync(destinationPath, json, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Exported settings to {Destination}", destinationPath);
+    }
+
+    public async Task ImportAsync(string sourcePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        if (!File.Exists(sourcePath))
+        {
+            throw new FileNotFoundException("Import file not found.", sourcePath);
+        }
+
+        var imported = await ReadSettingsFileAsync(sourcePath, cancellationToken).ConfigureAwait(false)
+                       ?? AppSettings.CreateDefault();
+        NormalizeNulls(imported);
+        SettingsMigrator.Migrate(imported);
+        SettingsValidator.ValidateAndRepair(imported);
+        await SaveAsync(imported, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Imported settings from {Source}", sourcePath);
+    }
+
+    public async Task ResetToDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        await SaveAsync(AppSettings.CreateDefault(), cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Reset settings to defaults");
     }
 
     public void Dispose()
@@ -160,19 +242,15 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
                 return;
             }
 
-            await using var stream = new FileStream(
-                SettingsPath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
-            var loaded = await JsonSerializer.DeserializeAsync<AppSettings>(stream, SerializerOptions)
-                .ConfigureAwait(false);
+            var loaded = await ReadSettingsFileAsync(SettingsPath, CancellationToken.None).ConfigureAwait(false);
             if (loaded is null)
             {
                 return;
             }
 
-            Normalize(loaded);
+            NormalizeNulls(loaded);
+            SettingsMigrator.Migrate(loaded);
+            SettingsValidator.ValidateAndRepair(loaded);
             lock (_gate)
             {
                 _current = loaded;
@@ -187,7 +265,46 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
         }
     }
 
-    private static void Normalize(AppSettings settings)
+    private void ApplyNotices(List<string> notices)
+    {
+        lock (_gate)
+        {
+            _lastLoadNotices = notices;
+        }
+    }
+
+    private bool TryRestoreFromBackup(List<string> notices)
+    {
+        if (!File.Exists(_paths.SettingsBackupFilePath))
+        {
+            return false;
+        }
+
+        try
+        {
+            File.Copy(_paths.SettingsBackupFilePath, SettingsPath, overwrite: true);
+            notices.Add("Restored settings from settings.backup.json.");
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Failed to restore settings from backup");
+            return false;
+        }
+    }
+
+    private static async Task<AppSettings?> ReadSettingsFileAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+        return await JsonSerializer.DeserializeAsync<AppSettings>(stream, SerializerOptions, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static void NormalizeNulls(AppSettings settings)
     {
         settings.Hotkeys ??= new HotkeySettings();
         settings.Suggestions ??= new SuggestionSettings();
@@ -203,13 +320,10 @@ public sealed class JsonSettingsStore : ISettingsStore, IDisposable
         settings.Grammar.DisabledRules ??= [];
         settings.SmartLists.DisabledProcesses ??= AppSettings.DefaultSmartListDisabledProcesses();
         settings.PromptAssist.Targets ??= AppSettings.DefaultPromptAssistTargets();
-        settings.PromptAssist.DetectionThreshold = Math.Clamp(settings.PromptAssist.DetectionThreshold, 0.0, 1.0);
-        settings.Suggestions.DebounceMs = Math.Clamp(settings.Suggestions.DebounceMs, 50, 10_000);
-        settings.Suggestions.MinCharsBeforeSuggest = Math.Clamp(settings.Suggestions.MinCharsBeforeSuggest, 1, 10_000);
-        settings.Suggestions.MaxContextChars = Math.Clamp(settings.Suggestions.MaxContextChars, 32, 20_000);
-        settings.Grammar.RequestTimeoutMs = Math.Clamp(settings.Grammar.RequestTimeoutMs, 50, 10_000);
-        settings.Llm.TimeoutMs = Math.Clamp(settings.Llm.TimeoutMs, 500, 120_000);
-        settings.Llm.MaxTokens = Math.Clamp(settings.Llm.MaxTokens, 1, 2048);
+        if (string.IsNullOrWhiteSpace(settings.UiLanguage))
+        {
+            settings.UiLanguage = "auto";
+        }
     }
 
     private static AppSettings Clone(AppSettings source)

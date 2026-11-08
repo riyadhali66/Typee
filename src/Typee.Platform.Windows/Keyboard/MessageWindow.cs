@@ -74,7 +74,7 @@ internal sealed class MessageWindow : IDisposable
 
         if (failure is not null)
         {
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+            global::System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
         }
 
         return true;
@@ -185,15 +185,23 @@ internal sealed class MessageWindow : IDisposable
             return 0;
         }
 
+        if (_windowInstance?._customMessageHandler?.Invoke(msg, wParam, lParam) == true)
+        {
+            return 0;
+        }
+
         return DefWindowProcW(hWnd, msg, wParam, lParam);
     }
 
     private static MessageWindow? _windowInstance;
 
     private Action<int>? _hotkeyHandlers;
+    private Func<uint, nint, nint, bool>? _customMessageHandler;
 
     /// <summary>Registers a handler invoked on the window thread with the hotkey id from WM_HOTKEY.</summary>
     public void SetHotkeyHandler(Action<int> handler) => _hotkeyHandlers = handler;
+
+    public void SetCustomMessageHandler(Func<uint, nint, nint, bool>? handler) => _customMessageHandler = handler;
 
     public void Dispose()
     {

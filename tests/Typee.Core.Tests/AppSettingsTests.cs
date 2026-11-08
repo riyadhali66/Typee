@@ -10,6 +10,10 @@ public sealed class AppSettingsTests
     {
         var settings = AppSettings.CreateDefault();
 
+        Assert.Equal(1, settings.SchemaVersion);
+        Assert.True(settings.PauseInFullscreen);
+        Assert.Equal("auto", settings.UiLanguage);
+
         Assert.Equal("Ctrl+Shift+Space", settings.Hotkeys.CommandBar);
         Assert.Equal("Ctrl+Alt+Enter", settings.Hotkeys.SendToLastAi);
         Assert.Equal("Ctrl+Alt+L", settings.Hotkeys.ListStylePicker);
