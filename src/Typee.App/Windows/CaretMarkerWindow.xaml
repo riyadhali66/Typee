@@ -1,0 +1,13 @@
+<Window x:Class="Typee.App.Windows.CaretMarkerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#E6FF0000"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        Width="4"
+        Height="18"
+        IsHitTestVisible="False"
+        ResizeMode="NoResize" />

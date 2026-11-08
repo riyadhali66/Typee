@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/hardening-now` (raw-input watchdog next commit; then `phase/3-caret-uia`) |
-| Last completed | Phase 2 soak: all good; Raw Input hook watchdog (no GetLastInputInfo) |
-| Next task | Push watchdog → Phase 3 caret/UIA → Checkpoint A |
+| Current branch | `phase/3-caret-uia` |
+| Last completed | Phase 3: caret locator + UIA text context + debug caret marker |
+| Next task | Manual Checkpoint A matrix; then Phase 4 overlay |
 | Half-done | None |
 | Uncommitted risks | None |
 | Updated | 2026-11-08 (Cursor) |
@@ -22,7 +22,7 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
 | 1+ — Hardening now (crash/settings/DLL) | [x] | §9 now |
 | 2 — Keyboard hook + hotkeys | [x] code + §9 P2 watchdog/events; soak [ ] | 956ce66 |
-| 3 — Caret tracking + UIA text context | [ ] | |
+| 3 — Caret tracking + UIA text context | [x] code; Checkpoint A manual [ ] | feat(phase-3) |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
 | 6 — Harper grammar | [ ] | |
@@ -166,23 +166,36 @@ Tasks:
 
 ---
 
-## Phase 3 — Caret tracking + UIA text context — TODO
+## Phase 3 — Caret tracking + UIA text context — DONE (code)
 
-Plan (files):
-- Core: `ICaretLocator`, `ITextContextReader`, models (`CaretRect`, `TextContext`, `TextSpan`), `Text/TextSegmenter.cs` (sentence/paragraph/line split, pure).
-- Platform: COM reference `UIAutomationClient`; `Uia/UiaThread` (dedicated STA thread, 150 ms per call); `Caret/CaretLocator.cs` (chain: GetGUIThreadInfo → TextPattern2.GetCaretRange → GetSelection → element rect; Chromium empty-rect fix: expand 1 char back, right edge); `Uia/UiaTextContextReader.cs`; `Uia/UiaElementCache` + `FocusMonitor` (SetWinEventHook foreground/focus); `ProcessInfoService` (process name, elevated check via token elevation); password/blocklist/elevated skips.
-- App: debug tray option "Show caret marker" (polling non-activating marker window).
-- Tests: TextSegmenter, rect math (DPI, clamp, flip above/below).
+Built: Core `ICaretLocator`, `ITextContextReader`, `ITargetContextGuard`, models (`CaretLocation`, `ScreenRect`, `MonitorInfo`, `TextContext`, `TextSpan`, …), `Text/TextSegmenter`, `Text/OverlayLayoutMath` + 8 unit tests. Platform: `Interop.UIAutomationClient` (namespace `Interop.UIAutomationClient`, embed types false), `UiaThread` (STA + 150 ms timeout), `CaretLocator` (GetGUIThreadInfo → TextPattern2 → selection → bounds), `UiaTextContextReader`, `UiaElementCache`, `FocusMonitor` (SetWinEventHook), `ProcessInfoService` (blocklist, elevation, password, `pauseInFullscreen` via `SHQueryUserNotificationState`). App: tray **Show caret marker** (`CaretMarkerWindow` + `CaretMarkerService`, `WS_EX_NOACTIVATE`).
 
 Tasks:
-- [ ] Core: interfaces + models + TextSegmenter + tests
-- [ ] Platform: UIA COM reference + UiaThread executor
-- [ ] Platform: CaretLocator chain + tests of pure parts
-- [ ] Platform: UiaTextContextReader (read + select + range rects)
-- [ ] Platform: FocusMonitor + element cache refresh
-- [ ] Platform: ProcessInfoService (blocklist, password skip, elevation)
-- [ ] App: caret marker debug window + wiring
-- [ ] Gate: build/test/soak; manual matrix (Notepad, Word, Chrome, Edge, VS Code, WPF app, WhatsApp; 150% DPI; second monitor)
+- [x] Core: interfaces + models + TextSegmenter + tests
+- [x] Platform: UIA COM reference + UiaThread executor
+- [x] Platform: CaretLocator chain + tests of pure parts
+- [x] Platform: UiaTextContextReader (read + select + range rects)
+- [x] Platform: FocusMonitor + element cache refresh
+- [x] Platform: ProcessInfoService (blocklist, password skip, elevation)
+- [x] App: caret marker debug window + wiring
+- [x] Gate: `dotnet build` / `dotnet test` — 0 warnings, 0 errors
+- [ ] Checkpoint A manual matrix (see below)
+
+### Checkpoint A — manual tests
+
+1. Enable tray **Show caret marker**; red bar tracks caret in Notepad while typing (no focus steal).
+2. Repeat in Word, Chrome textarea, Edge, VS Code editor, any simple WPF text box, WhatsApp desktop chat.
+3. Move window to second monitor; marker stays aligned; test 150% display scaling.
+4. Focus KeePass/elevated admin Notepad: marker hidden (skip rules).
+5. Password field in browser: no marker / no context read.
+6. Full-screen game or presentation with `pauseInFullscreen=true`: marker pauses.
+7. Logs: no user keystrokes or document text (counts/method names only).
+
+### Phase 3 deferred (still on cross-phase list)
+
+- Display-change → refresh monitor/DPI cache (overlays in Phase 4)
+- `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
+- Per-process caret method memory in `typee.db`
 
 ## Phase 4 — Suggestion overlay — TODO
 

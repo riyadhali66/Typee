@@ -164,6 +164,142 @@ internal static partial class NativeMethods
     public const int VkLWin = 0x5B;
     public const int VkRWin = 0x5C;
 
+    public const uint EventSystemForeground = 0x0003;
+    public const uint EventObjectFocus = 0x8005;
+    public const uint WineventOutofcontext = 0x0000;
+    public const uint WineventSkipownprocess = 0x0002;
+
+    public const uint ProcessQueryLimitedInformation = 0x1000;
+    public const uint TokenQuery = 0x0008;
+    public const int TokenElevationInformationClass = 20;
+
+    public const int QunsRunningD3dFullScreen = 3;
+    public const int QunsPresentationMode = 4;
+
+    public const uint MonitorDefaulttonearest = 0x00000002;
+    public const int MdtEffectiveDpi = 0;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo lpgui);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ClientToScreen(nint hWnd, ref Point lpPoint);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint GetForegroundWindow();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        nint hmodWinEventProc,
+        WinEventProc lpfnWinEventProc,
+        uint idProcess,
+        uint idThread,
+        uint dwFlags);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool UnhookWinEvent(nint hWinEventHook);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint MonitorFromPoint(Point pt, uint dwFlags);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint MonitorFromRect(in Rect lprc, uint dwFlags);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool OpenProcessToken(nint processHandle, uint desiredAccess, out nint tokenHandle);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseHandle(nint hObject);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial nint OpenProcess(uint dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, uint dwProcessId);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetTokenInformation(
+        nint tokenHandle,
+        int tokenInformationClass,
+        nint tokenInformation,
+        uint tokenInformationLength,
+        out uint returnLength);
+
+    [LibraryImport("shell32.dll")]
+    internal static partial int SHQueryUserNotificationState(out int pquns);
+
+    [LibraryImport("shcore.dll")]
+    internal static partial int GetDpiForMonitor(nint hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetWindowRect(nint hWnd, out Rect lpRect);
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate void WinEventProc(
+        nint hWinEventHook,
+        uint eventType,
+        nint hwnd,
+        int idObject,
+        int idChild,
+        uint dwEventThread,
+        uint dwmsEventTime);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GuiThreadInfo
+    {
+        public int CbSize;
+        public uint Flags;
+        public nint HwndActive;
+        public nint HwndFocus;
+        public nint HwndCapture;
+        public nint HwndMenuOwner;
+        public nint HwndMoveSize;
+        public nint HwndCaret;
+        public Rect RcCaret;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct MonitorInfoEx
+    {
+        public uint CbSize;
+        public Rect Monitor;
+        public Rect WorkArea;
+        public uint Flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct TokenElevation
+    {
+        public int TokenIsElevated;
+    }
+
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate nint HookProc(int code, nint wParam, nint lParam);
 

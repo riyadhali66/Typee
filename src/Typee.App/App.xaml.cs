@@ -13,6 +13,7 @@ using Typee.Core;
 using Typee.Core.Abstractions;
 using Typee.Core.Reliability;
 using Typee.Core.Typing;
+using Typee.Platform.Windows;
 using Typee.Platform.Windows.Keyboard;
 using Typee.Platform.Windows.SystemEvents;
 using Typee.Storage;
@@ -86,6 +87,8 @@ public partial class App : Application
                         TimeProvider.System,
                         sp.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs));
                     services.AddSingleton<HotkeyCoordinator>();
+                    services.AddTypeePlatformWindows();
+                    services.AddSingleton<CaretMarkerService>();
                     services.AddSingleton<TrayIconHost>();
                     services.AddSingleton<SystemEventMonitor>();
                 })

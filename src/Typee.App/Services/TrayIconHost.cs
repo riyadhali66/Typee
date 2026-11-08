@@ -21,10 +21,12 @@ public sealed class TrayIconHost : IDisposable
     private readonly ISettingsStore _settingsStore;
     private readonly IAppPaths _paths;
     private readonly TypingActivityService _typingActivity;
+    private readonly CaretMarkerService _caretMarker;
     private readonly ILogger<TrayIconHost> _logger;
     private readonly TaskbarIcon _trayIcon;
     private readonly MenuItem _pauseResumeItem;
     private readonly MenuItem _showKeyActivityItem;
+    private readonly MenuItem _showCaretMarkerItem;
     private SettingsWindow? _settingsWindow;
     private bool _showKeyActivity;
     private bool _disposed;
@@ -33,11 +35,13 @@ public sealed class TrayIconHost : IDisposable
         ISettingsStore settingsStore,
         IAppPaths paths,
         TypingActivityService typingActivity,
+        CaretMarkerService caretMarker,
         ILogger<TrayIconHost> logger)
     {
         _settingsStore = settingsStore;
         _paths = paths;
         _typingActivity = typingActivity;
+        _caretMarker = caretMarker;
         _logger = logger;
 
         _pauseResumeItem = new MenuItem
@@ -55,6 +59,9 @@ public sealed class TrayIconHost : IDisposable
         _showKeyActivityItem = new MenuItem { Header = "Show key activity", IsCheckable = true };
         _showKeyActivityItem.Click += OnShowKeyActivityClicked;
 
+        _showCaretMarkerItem = new MenuItem { Header = "Show caret marker", IsCheckable = true };
+        _showCaretMarkerItem.Click += OnShowCaretMarkerClicked;
+
         var exitItem = new MenuItem { Header = "Exit" };
         exitItem.Click += (_, _) => ExitApplication();
 
@@ -63,6 +70,7 @@ public sealed class TrayIconHost : IDisposable
         menu.Items.Add(settingsItem);
         menu.Items.Add(logsItem);
         menu.Items.Add(_showKeyActivityItem);
+        menu.Items.Add(_showCaretMarkerItem);
         menu.Items.Add(new Separator());
         menu.Items.Add(exitItem);
 
@@ -155,6 +163,13 @@ public sealed class TrayIconHost : IDisposable
                 ? "Pause suggestions"
                 : "Enable suggestions";
         });
+    }
+
+    private void OnShowCaretMarkerClicked(object sender, RoutedEventArgs e)
+    {
+        var enabled = _showCaretMarkerItem.IsChecked;
+        _caretMarker.SetEnabled(enabled);
+        _logger.LogInformation("Caret marker debug {State}", enabled ? "on" : "off");
     }
 
     private void OnShowKeyActivityClicked(object sender, RoutedEventArgs e)

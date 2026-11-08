@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 3: `ICaretLocator` / `ITextContextReader` with UIA TextPattern + Win32 fallbacks; `ProcessInfoService` skips (blocklist, elevated, password, fullscreen); tray debug **Show caret marker**; `TextSegmenter` + layout math unit tests.
 - §9 hardening (now): crash marker + diagnostic clipboard offer; global exception handlers with tray notifications; `ServiceSupervisor` with 1s/5s/30s backoff for the keyboard hook.
 - Settings `schemaVersion` 1, migrator/validator, `settings.backup.json`, import/export/reset; Privacy tab (clear local data; DB wipe Phase 5).
 - `SetDefaultDllDirectories` at app startup; hook watchdog (`GetLastInputInfo`); system resume + `TaskbarCreated` handling.
