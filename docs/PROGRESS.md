@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `main` (tag `checkpoint-a`) |
-| Last completed | Checkpoint A partially verified — logs clean; manual app tests deferred to B |
-| Next task | `fix/watchdog-elevated`, then Phases 4 → 8 to Checkpoint B |
+| Current branch | `fix/watchdog-elevated` |
+| Last completed | Checkpoint A partial (tag `checkpoint-a`); watchdog elevated skip in progress |
+| Next task | Merge watchdog fix; then Phase 4 → 8 to Checkpoint B |
 | Half-done | None |
 | Uncommitted risks | None |
 | Updated | 2026-11-09 (Cursor) |
@@ -22,7 +22,7 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
 | 1+ — Hardening now (crash/settings/DLL) | [x] merged to main | §9 now |
 | 2 — Keyboard hook + hotkeys | [x] merged; raw-input watchdog on main; soak [x] | d3251d8 |
-| 3 — Caret tracking + UIA text context | [x] merged to main; Checkpoint A manual [ ] | fabc808 |
+| 3 — Caret tracking + UIA text context | [x] merged; Checkpoint A partial | fabc808 / tag `checkpoint-a` |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
 | 6 — Harper grammar | [ ] | |
@@ -180,17 +180,19 @@ Tasks:
 - [x] Privacy: fail-closed elevation/password; `TryGetSafeFocusedElement` same-instance re-check
 - [x] App: caret marker debug window + wiring
 - [x] Gate: `dotnet build` / `dotnet test` — 0 warnings, 0 errors
-- [ ] Checkpoint A manual matrix (see below)
+- [x] Checkpoint A — **partially verified** — logs clean confirmed by agent; manual app tests deferred to Checkpoint B (tag `checkpoint-a`)
 
 ### Checkpoint A — manual tests
 
-1. Enable tray **Show caret marker**; red bar tracks caret in Notepad while typing (no focus steal).
-2. Repeat in Word, Chrome textarea, Edge, VS Code editor, any simple WPF text box, WhatsApp desktop chat.
-3. Move window to second monitor; marker stays aligned; test 150% display scaling.
-4. Focus KeePass/elevated admin Notepad: marker hidden (skip rules).
-5. Password field in browser: no marker / no context read.
-6. Full-screen game or presentation with `pauseInFullscreen=true`: marker pauses.
-7. Logs: no user keystrokes or document text (counts/method names only).
+Status: **partially verified — logs clean confirmed by agent, manual app tests deferred to Checkpoint B**.
+
+1. Enable tray **Show caret marker**; red bar tracks caret in Notepad while typing (no focus steal). — deferred
+2. Repeat in Word, Chrome textarea, Edge, VS Code editor, any simple WPF text box, WhatsApp desktop chat. — deferred
+3. Move window to second monitor; marker stays aligned; test 150% display scaling. — deferred
+4. Focus KeePass/elevated admin Notepad: marker hidden (skip rules). — deferred
+5. Password field in browser: no marker / no context read. — deferred
+6. Full-screen game or presentation with `pauseInFullscreen=true`: marker pauses. — deferred
+7. Logs: no user keystrokes or document text (counts/method names only). — **confirmed** (agent)
 
 ### Phase 3 deferred (still on cross-phase list)
 

@@ -7,6 +7,7 @@ using Typee.Core.Abstractions;
 using Typee.Core.Input;
 using Typee.Core.Typing;
 using Typee.Platform.Windows.Interop;
+using Typee.Platform.Windows.Process;
 using static Typee.Platform.Windows.Interop.NativeMethods;
 
 namespace Typee.Platform.Windows.Keyboard;
@@ -24,6 +25,7 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
 
     private readonly KeyboardInterceptionState _interception;
     private readonly IRawKeyboardActivityClock _rawKeyboardClock;
+    private readonly ISessionLockState _sessionLockState;
     private readonly ILogger<KeyboardHookService> _logger;
     private readonly Channel<KeyboardEvent> _channel = Channel.CreateBounded<KeyboardEvent>(
         new BoundedChannelOptions(ChannelCapacity) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
@@ -120,10 +122,12 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     public KeyboardHookService(
         KeyboardInterceptionState interception,
         IRawKeyboardActivityClock rawKeyboardClock,
+        ISessionLockState sessionLockState,
         ILogger<KeyboardHookService> logger)
     {
         _interception = interception;
         _rawKeyboardClock = rawKeyboardClock;
+        _sessionLockState = sessionLockState;
         _logger = logger;
     }
 
@@ -312,11 +316,22 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
         }
 
         // Raw-keyboard sink (RIDEV_INPUTSINK) vs LL-hook timestamps — never key codes.
+        // Skip when LL hook cannot see input (elevated target, secure desktop, lock screen).
         var now = Environment.TickCount;
         var lastRaw = _rawKeyboardClock.LastRawKeyboardTick;
         var lastHook = Volatile.Read(ref _lastSeenEventTick);
         var lastReinstall = Volatile.Read(ref _lastReinstallTick);
-        if (HookWatchdogDecision.ShouldReinstall(now, lastRaw, lastHook, lastReinstall))
+        var elevated = ProcessElevation.IsForegroundElevatedOrUnknown();
+        var secureDesktop = SecureDesktopProbe.IsSecureDesktopActive();
+        var locked = _sessionLockState.IsLocked;
+        if (HookWatchdogDecision.ShouldReinstall(
+                now,
+                lastRaw,
+                lastHook,
+                lastReinstall,
+                foregroundElevatedOrUnknown: elevated,
+                secureDesktopActive: secureDesktop,
+                sessionLocked: locked))
         {
             _logger.LogWarning("Hook watchdog: raw keyboard recent but hook quiet — reinstalling");
             Reinstall();

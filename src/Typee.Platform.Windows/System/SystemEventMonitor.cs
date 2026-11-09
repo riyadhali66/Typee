@@ -15,16 +15,19 @@ public sealed class SystemEventMonitor : IDisposable
 {
     private readonly ILogger<SystemEventMonitor> _logger;
     private readonly IRawKeyboardActivityClock _rawKeyboardClock;
+    private readonly ISessionLockState _sessionLockState;
     private readonly MessageWindow _window;
     private readonly uint _taskbarCreatedMessage;
     private bool _disposed;
 
     public SystemEventMonitor(
         ILogger<SystemEventMonitor> logger,
-        IRawKeyboardActivityClock rawKeyboardClock)
+        IRawKeyboardActivityClock rawKeyboardClock,
+        ISessionLockState sessionLockState)
     {
         _logger = logger;
         _rawKeyboardClock = rawKeyboardClock;
+        _sessionLockState = sessionLockState;
         _window = new MessageWindow(logger);
         _taskbarCreatedMessage = RegisterWindowMessageW("TaskbarCreated");
         _window.SetCustomMessageHandler(HandleMessage);
@@ -80,8 +83,14 @@ public sealed class SystemEventMonitor : IDisposable
         if (msg == WmWtsSessionChange)
         {
             var sessionEvent = (int)wParam;
-            if (sessionEvent is WtsSessionUnlock or WtsSessionLogon)
+            if (sessionEvent is WtsSessionLock)
             {
+                _sessionLockState.SetLocked(true);
+                _logger.LogInformation("WTS session locked");
+            }
+            else if (sessionEvent is WtsSessionUnlock or WtsSessionLogon)
+            {
+                _sessionLockState.SetLocked(false);
                 _logger.LogInformation("WTS session change {Event} — raising SystemResumed", sessionEvent);
                 SystemResumed?.Invoke(this, EventArgs.Empty);
             }

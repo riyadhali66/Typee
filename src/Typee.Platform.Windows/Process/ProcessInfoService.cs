@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
 using Typee.Core.Models;
@@ -114,7 +113,7 @@ public sealed class ProcessInfoService : ITargetContextGuard
         }
 
         // Fail closed: missing PID is unverifiable elevation.
-        if (TryGetProcessId(hwnd) is not uint pid || IsProcessElevatedOrUnknown(pid))
+        if (TryGetProcessId(hwnd) is not uint pid || ProcessElevation.IsElevatedOrUnknown(pid))
         {
             _logger.LogDebug("Skipping elevated or unverifiable target process {Process}", processName ?? "(unknown)");
             return TargetSkipReason.ElevatedTarget;
@@ -149,52 +148,6 @@ public sealed class ProcessInfoService : ITargetContextGuard
     {
         _ = GetWindowThreadProcessId(hwnd, out var pid);
         return pid == 0 ? null : pid;
-    }
-
-    /// <summary>Returns true if elevated OR elevation cannot be determined (fail closed).</summary>
-    private static bool IsProcessElevatedOrUnknown(uint processId)
-    {
-        var hProcess = OpenProcess(ProcessQueryLimitedInformation, false, processId);
-        if (hProcess == 0)
-        {
-            return true;
-        }
-
-        try
-        {
-            if (!OpenProcessToken(hProcess, TokenQuery, out var token))
-            {
-                return true;
-            }
-
-            try
-            {
-                var size = (uint)Marshal.SizeOf<TokenElevation>();
-                var ptr = Marshal.AllocHGlobal((int)size);
-                try
-                {
-                    if (!GetTokenInformation(token, TokenElevationInformationClass, ptr, size, out _))
-                    {
-                        return true;
-                    }
-
-                    var elevation = Marshal.PtrToStructure<TokenElevation>(ptr);
-                    return elevation.TokenIsElevated != 0;
-                }
-                finally
-                {
-                    Marshal.FreeHGlobal(ptr);
-                }
-            }
-            finally
-            {
-                _ = CloseHandle(token);
-            }
-        }
-        finally
-        {
-            _ = CloseHandle(hProcess);
-        }
     }
 
     private bool IsFullScreenPresentation()
