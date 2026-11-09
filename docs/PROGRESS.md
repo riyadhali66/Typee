@@ -8,21 +8,21 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/3-caret-uia` |
-| Last completed | Phase 3 privacy fail-closed (elevation/password/TOCTOU) |
-| Next task | Manual Checkpoint A matrix; then Phase 4 overlay |
-| Half-done | None |
-| Uncommitted risks | None |
-| Updated | 2026-11-08 (Cursor) |
+| Current branch | `main` @ `fabc808` (includes `d3251d8` raw-input watchdog + Phase 3) |
+| Last completed | Pushed hardening + Phase 3 onto `origin/main` |
+| Next task | Checkpoint A filled results → then Phase 4 overlay |
+| Half-done | Checkpoint A — template received blank; not marked passed |
+| Uncommitted risks | Watchdog may reinstall when foreground is elevated (raw sink sees keys; LL hook does not) |
+| Updated | 2026-11-09 (Cursor) |
 
 ## Phase status
 
 | Phase | Status | Commit |
 |---|---|---|
 | 1 — Skeleton, tray, settings, logging | [x] done (audited + completed) | cfe787e → fix(phase-1) |
-| 1+ — Hardening now (crash/settings/DLL) | [x] | §9 now |
-| 2 — Keyboard hook + hotkeys | [x] code + §9 P2 raw-input watchdog; soak [x] | d3251d8 |
-| 3 — Caret tracking + UIA text context | [x] code; Checkpoint A manual [ ] | feat(phase-3) + privacy fix |
+| 1+ — Hardening now (crash/settings/DLL) | [x] merged to main | §9 now |
+| 2 — Keyboard hook + hotkeys | [x] merged; raw-input watchdog on main; soak [x] | d3251d8 |
+| 3 — Caret tracking + UIA text context | [x] merged to main; Checkpoint A manual [ ] | fabc808 |
 | 4 — Suggestion overlay | [ ] | |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
 | 6 — Harper grammar | [ ] | |
