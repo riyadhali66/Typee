@@ -34,7 +34,12 @@
     "apiKeyEnvVar": "TYPEE_API_KEY",
     "timeoutMs": 8000,
     "maxTokens": 60,
-    "temperature": 0.3
+    "temperature": 0.3,
+    "maxRequestsPerMinute": 20,
+    "dailyRequestCap": null
+  },
+  "privacy": {
+    "llmConsentAccepted": false
   },
   "button": { "enabled": true, "hideWhileTyping": true },
   "smartLists": {

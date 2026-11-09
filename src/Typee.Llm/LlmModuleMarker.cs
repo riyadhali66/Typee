@@ -1,10 +1,7 @@
 namespace Typee.Llm;
 
-/// <summary>
-/// Phase 1 placeholder so the Llm project compiles and can be referenced by the app.
-/// OpenAI-compatible client lands in Phase 7.
-/// </summary>
+/// <summary>Assembly marker for Typee.Llm (OpenAI-compatible client + prompts).</summary>
 public static class LlmModuleMarker
 {
-    public const string PhaseStatus = "Deferred until Phase 7";
+    public const string PhaseStatus = "Phase 7";
 }

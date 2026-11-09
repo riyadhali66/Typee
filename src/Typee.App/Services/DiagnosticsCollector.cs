@@ -12,6 +12,7 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
 
     private readonly KeyboardHookService _hook;
     private readonly IGrammarChecker? _grammar;
+    private readonly ILlmClient? _llm;
     private readonly object _gate = new();
     private readonly Queue<string> _errors = new();
     private readonly Process _process = Process.GetCurrentProcess();
@@ -21,10 +22,14 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
     private string _caretMethod = "—";
     private string? _foregroundProcess;
 
-    public DiagnosticsCollector(KeyboardHookService hook, IGrammarChecker? grammar = null)
+    public DiagnosticsCollector(
+        KeyboardHookService hook,
+        IGrammarChecker? grammar = null,
+        ILlmClient? llm = null)
     {
         _hook = hook;
         _grammar = grammar;
+        _llm = llm;
         _lastCpu = _process.TotalProcessorTime;
     }
 
@@ -93,7 +98,9 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
             CaretMethod = process is null ? caret : $"{caret} ({process})",
             ForegroundProcess = process,
             HarperStatus = _grammar?.Status ?? "Not started",
-            LlmStatus = "Not started (Phase 7)",
+            LlmStatus = _llm is null
+                ? "Not started"
+                : (_llm.IsOnline ? _llm.Status : $"Offline ({_llm.Status})"),
             RecentErrors = errors
         };
     }

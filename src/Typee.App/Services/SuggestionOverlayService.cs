@@ -7,6 +7,7 @@ using Typee.App.Windows;
 using Typee.Core.Abstractions;
 using Typee.Core.Input;
 using Typee.Core.Models;
+using Typee.Core.Suggestions;
 using Typee.Core.Text;
 using Typee.Core.Typing;
 using Typee.Platform.Windows.Process;
@@ -16,7 +17,7 @@ using static Typee.App.Interop.NativeMethods;
 namespace Typee.App.Services;
 
 /// <summary>
-/// Owns the suggestion overlay window lifecycle: positioning, hide rules, dummy pipeline,
+/// Owns the suggestion overlay window lifecycle: positioning, hide rules, suggestion pipeline,
 /// and fullscreen pause. Never inserts text (Phase 8) and never logs suggestion content.
 /// </summary>
 public sealed class SuggestionOverlayService : IDisposable
@@ -25,6 +26,7 @@ public sealed class SuggestionOverlayService : IDisposable
     private const double CaretMoveTolerancePhysical = 12;
 
     private readonly SuggestionOverlayViewModel _viewModel;
+    private readonly SuggestionPipelineService _pipeline;
     private readonly ICaretLocator _caretLocator;
     private readonly IKeyboardEvents _keyboardEvents;
     private readonly TypingActivityService _typingActivity;
@@ -42,9 +44,11 @@ public sealed class SuggestionOverlayService : IDisposable
     private bool _disposed;
     private bool _leftButtonWasDown;
     private ScreenRect? _anchorCaret;
+    private int _pipelineEpoch;
 
     public SuggestionOverlayService(
         SuggestionOverlayViewModel viewModel,
+        SuggestionPipelineService pipeline,
         ICaretLocator caretLocator,
         IKeyboardEvents keyboardEvents,
         TypingActivityService typingActivity,
@@ -56,6 +60,7 @@ public sealed class SuggestionOverlayService : IDisposable
         ILogger<SuggestionOverlayService> logger)
     {
         _viewModel = viewModel;
+        _pipeline = pipeline;
         _caretLocator = caretLocator;
         _keyboardEvents = keyboardEvents;
         _typingActivity = typingActivity;
@@ -112,25 +117,39 @@ public sealed class SuggestionOverlayService : IDisposable
         _dispatcher.BeginInvoke(() => HideInternal());
     }
 
-    private void ShowInternal(Suggestion suggestion, CaretLocation located)
+    private void ShowInternal(Suggestion suggestion, CaretLocation? located)
     {
         EnsureWindow();
         _viewModel.ApplyFlowDirection(_uiLanguage.CurrentFlowDirection);
         _viewModel.Show(suggestion);
-        _anchorCaret = located.CaretRect;
+        _anchorCaret = located?.CaretRect ?? suggestion.AnchorCaret;
+
+        var monitor = located?.Monitor ?? suggestion.Monitor;
+        if (monitor is null || _anchorCaret is null)
+        {
+            if (!_window!.IsVisible)
+            {
+                _window.Show();
+            }
+
+            _window.FadeIn();
+            StartPolling();
+            _logger.LogInformation("Suggestion overlay shown without caret (kind={Kind})", suggestion.Kind);
+            return;
+        }
 
         var heightDip = Math.Max(_window!.ActualHeight, 120);
-        var heightPhysical = heightDip * located.Monitor.DpiY / 96.0;
+        var heightPhysical = heightDip * monitor.DpiY / 96.0;
         if (heightPhysical < 1)
         {
             heightPhysical = OverlayHeightEstimatePhysical;
         }
 
         var placed = OverlayLayoutMath.PositionBelowCaret(
-            located.CaretRect,
+            _anchorCaret.Value,
             heightPhysical,
-            located.Monitor.WorkAreaPhysical);
-        _window.PlacePhysical(placed.Left, placed.Top, located.Monitor.DpiX, located.Monitor.DpiY);
+            monitor.WorkAreaPhysical);
+        _window.PlacePhysical(placed.Left, placed.Top, monitor.DpiX, monitor.DpiY);
 
         if (!_window.IsVisible)
         {
@@ -275,26 +294,81 @@ public sealed class SuggestionOverlayService : IDisposable
 
     private void OnTypingPaused(object? sender, EventArgs e)
     {
-        if (!_autoDummyOnPause && !_settingsStore.Current.Suggestions.DebugDummyOnPause)
-        {
-            return;
-        }
-
         if (!_settingsStore.Current.Suggestions.Enabled)
         {
             return;
         }
 
-        ShowDummy();
+        if (_autoDummyOnPause || _settingsStore.Current.Suggestions.DebugDummyOnPause)
+        {
+            ShowDummy();
+            return;
+        }
+
+        var epoch = Interlocked.Increment(ref _pipelineEpoch);
+        _ = RunPipelineAsync(epoch);
+    }
+
+    private async Task RunPipelineAsync(int epoch)
+    {
+        try
+        {
+            var result = await _pipeline.RunAsync().ConfigureAwait(false);
+            if (epoch != Volatile.Read(ref _pipelineEpoch))
+            {
+                return;
+            }
+
+            if (!result.IsSuccess || result.Suggestion is null)
+            {
+                if (result.Outcome is not ("cancelled" or "stale" or "too-short" or "no-match" or "no-context"))
+                {
+                    _logger.LogInformation("Pipeline outcome={Outcome}", result.Outcome);
+                }
+
+                return;
+            }
+
+            var suggestion = result.Suggestion;
+            await _dispatcher.InvokeAsync(() =>
+            {
+                if (epoch != Volatile.Read(ref _pipelineEpoch))
+                {
+                    return;
+                }
+
+                if (_processInfo.ShouldPauseOverlays() || _processInfo.GetSkipReason() is not null)
+                {
+                    return;
+                }
+
+                var located = _caretLocator.TryLocate();
+                if (located is not null)
+                {
+                    _diagnostics.NoteCaretMethod(located.Method.ToString(), null);
+                }
+
+                ShowInternal(suggestion, located);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Pipeline run failed");
+            _diagnostics.RecordError($"pipeline:{ex.GetType().Name}");
+        }
     }
 
     private void OnTypingResumed(object? sender, EventArgs e)
     {
+        Interlocked.Increment(ref _pipelineEpoch);
+        _pipeline.Cancel();
         // Hide/trim is driven by OnKeyEvent (first key of the resume).
     }
 
     private void OnFocusChanged(object? sender, EventArgs e)
     {
+        Interlocked.Increment(ref _pipelineEpoch);
+        _pipeline.Cancel();
         if (!_viewModel.IsVisible)
         {
             return;
@@ -341,6 +415,8 @@ public sealed class SuggestionOverlayService : IDisposable
         }
 
         _disposed = true;
+        Interlocked.Increment(ref _pipelineEpoch);
+        _pipeline.Cancel();
         _keyboardEvents.KeyEvent -= OnKeyEvent;
         _typingActivity.TypingPaused -= OnTypingPaused;
         _typingActivity.TypingResumed -= OnTypingResumed;
