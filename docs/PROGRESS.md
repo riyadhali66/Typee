@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `fix/watchdog-elevated` |
-| Last completed | Checkpoint A partial (tag `checkpoint-a`); watchdog elevated skip in progress |
-| Next task | Merge watchdog fix; then Phase 4 → 8 to Checkpoint B |
+| Current branch | `phase/4-suggestion-overlay` |
+| Last completed | Phase 4 suggestion overlay + diagnostics + resx scaffold |
+| Next task | Merge Phase 4 → main; then Phase 5 → Checkpoint B |
 | Half-done | None |
 | Uncommitted risks | None |
 | Updated | 2026-11-09 (Cursor) |
@@ -23,7 +23,7 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 1+ — Hardening now (crash/settings/DLL) | [x] merged to main | §9 now |
 | 2 — Keyboard hook + hotkeys | [x] merged; raw-input watchdog on main; soak [x] | d3251d8 |
 | 3 — Caret tracking + UIA text context | [x] merged; Checkpoint A partial | fabc808 / tag `checkpoint-a` |
-| 4 — Suggestion overlay | [ ] | |
+| 4 — Suggestion overlay | [x] code done; manual matrix deferred | (this branch) |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
 | 6 — Harper grammar | [ ] | |
 | 7 — Pipeline + LLM + consent | [ ] | |
@@ -108,7 +108,7 @@ Tasks:
 - [x] §9.3 Debug callback duration > 1 ms logging
 - [x] §9.4 Sleep/resume + WTS session lock/unlock → reinstall hook + re-register hotkeys
 - [x] §9.4 Explorer restart (`TaskbarCreated`) → re-add tray icon
-- [~] §9.4 `pauseInFullscreen` setting only; `SHQueryUserNotificationState` deferred (overlays later)
+- [x] §9.4 `pauseInFullscreen` + `SHQueryUserNotificationState` (overlays respect in Phase 4)
 
 ### Phase 2 review notes (Z.ai draft → fixes)
 
@@ -133,7 +133,7 @@ Tasks:
 - [ ] Hook watchdog + Debug >1 ms callback log
 - [ ] Sleep/resume + WTS session notifications → reinstall hook/hotkeys
 - [ ] TaskbarCreated → re-add tray
-- [ ] pauseInFullscreen setting + SHQueryUserNotificationState (full overlay pause in Phase 4)
+- [x] pauseInFullscreen setting + SHQueryUserNotificationState (full overlay pause in Phase 4)
 
 ### Phase 3
 - [ ] Display-change → refresh monitor/DPI cache (overlays later)
@@ -142,9 +142,9 @@ Tasks:
 - [ ] Clipboard full-format preserve/restore (with Phase 8 inserter)
 
 ### Phase 4
-- [ ] Diagnostics window (tray → Diagnostics); never show user text
+- [x] Diagnostics window (tray → Diagnostics); never show user text
 - [ ] Performance budgets checked at checkpoint
-- [ ] Arabic/EN `.resx` + `uiLanguage`; a11y names; High Contrast; exclude Typee windows from caret/hook
+- [x] Arabic/EN `.resx` + `uiLanguage`; a11y names; High Contrast; exclude Typee windows from caret/hook
 
 ### Phase 6
 - [ ] On resume/unlock: verify harper-ls alive
@@ -200,13 +200,28 @@ Status: **partially verified — logs clean confirmed by agent, manual app tests
 - `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
 - Per-process caret method memory in `typee.db`
 
-## Phase 4 — Suggestion overlay — TODO
+## Phase 4 — Suggestion overlay — DONE (code)
 
-- [ ] Core: Suggestion model + router interfaces
-- [ ] App: overlay window (no-activate styles after HWND creation), positioning (below caret, above if no room, work-area clamp, physical px → DIP via target monitor DPI), fade
-- [ ] App: SuggestionOverlayViewModel (Show/Hide/IsVisible → drives hook swallow flag)
-- [ ] Hide rules: Esc, outside click, focus change, caret moved, typing resumed (+partial-match trim rule)
-- [ ] Dummy suggestion pipeline for manual testing; gate
+Built: Core `Suggestion` / `SuggestionKind` / `SuggestionLevel`, `ISuggestionOverlay`, `SuggestionTrim` (+ tests), `DiagnosticSnapshot` / `IDiagnosticsCollector`. App: non-activating `SuggestionOverlayWindow` (`WS_EX_NOACTIVATE|TOOLWINDOW|TOPMOST`), DPI-aware placement via `OverlayLayoutMath`, ~120 ms fade, light/dark/high-contrast card, `SuggestionOverlayViewModel` (Show/Hide/IsVisible → Tab/Esc swallow), hide on Esc/outside click/focus/caret move/skip/fullscreen, trim-on-matching-prefix (display-only; host still receives keys — intentional until Phase 8 insert), Alt+1/2/3 accept/dismiss, tray **Show dummy suggestion** + **Auto dummy on pause** (`suggestions.debugDummyOnPause`), Diagnostics window (CPU/RAM/hook/caret/harper+LLM placeholders/errors — no user text), `Strings.resx` + `Strings.ar.resx` scaffold + `uiLanguage`, OwnProcess skip for Typee windows, `pauseInFullscreen` hides overlay.
+
+Tasks:
+- [x] Core: Suggestion model + overlay interface + trim helper + tests
+- [x] App: overlay window (no-activate styles after HWND creation), positioning, fade, theme
+- [x] App: SuggestionOverlayViewModel (Show/Hide/IsVisible → drives hook swallow flag)
+- [x] Hide rules: Esc, outside click, focus change, caret moved, typing resumed (+partial-match trim)
+- [x] Dummy suggestion pipeline (tray + debug setting); pause suggestions hides overlay
+- [x] Diagnostics window (tray → Diagnostics); never user text
+- [x] EN+AR `.resx` scaffold; AutomationProperties.Name; uiLanguage validation
+- [x] Fullscreen pause for overlays; exclude OwnProcess
+- [x] Gate: `dotnet build` / `dotnet test` Release — 0 warnings, 0 errors
+- [ ] Gate: manual overlay beside caret in Notepad (Esc/Tab, no focus steal) — deferred to Checkpoint B
+
+### Phase 4 deferred / notes
+
+- [!] Display-change → refresh monitor/DPI cache + reposition overlays (still deferred; poll reposition not yet wired to WM_DISPLAYCHANGE)
+- [!] Performance budgets measured at Checkpoint B (Diagnostics window is the live surface)
+- [!] Trim does **not** swallow printable keys (only Tab/Esc): typed chars go to the host while the card shortens — correct for completion UX without Phase 8 insertion
+- [!] `tests/Typee.TestHost` still deferred (Phase 3 list)
 
 ## Phase 5 — SQLite storage — TODO
 

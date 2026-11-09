@@ -119,7 +119,24 @@ public sealed class ProcessInfoService : ITargetContextGuard
             return TargetSkipReason.ElevatedTarget;
         }
 
+        // Exclude Typee's own windows from caret / overlay targeting (§9.11).
+        if (pid == (uint)Environment.ProcessId)
+        {
+            return TargetSkipReason.OwnProcess;
+        }
+
         return null;
+    }
+
+    /// <summary>True when overlays should hide because fullscreen pause is active.</summary>
+    public bool ShouldPauseOverlays()
+    {
+        if (!_settingsStore.Current.PauseInFullscreen)
+        {
+            return false;
+        }
+
+        return IsFullScreenPresentation();
     }
 
     private static bool IsBlocklisted(string processName, IReadOnlyList<string> blocked) =>

@@ -1,0 +1,41 @@
+<Window x:Class="Typee.App.Windows.DiagnosticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Title}"
+        Height="420"
+        Width="480"
+        MinHeight="320"
+        MinWidth="400"
+        WindowStartupLocation="CenterScreen"
+        Background="#FFF7F8FA"
+        AutomationProperties.Name="{Binding Title}">
+  <DockPanel Margin="16">
+    <TextBlock DockPanel.Dock="Top"
+               Text="{Binding Title}"
+               FontSize="18"
+               FontWeight="SemiBold"
+               Margin="0,0,0,12"
+               AutomationProperties.Name="{Binding Title}"/>
+
+    <StackPanel>
+      <TextBlock Text="{Binding CpuText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding CpuText}"/>
+      <TextBlock Text="{Binding RamText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding RamText}"/>
+      <TextBlock Text="{Binding HookText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding HookText}"/>
+      <TextBlock Text="{Binding LastReinstallText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding LastReinstallText}"/>
+      <TextBlock Text="{Binding CaretMethodText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding CaretMethodText}"/>
+      <TextBlock Text="{Binding HarperText}" Margin="0,0,0,6" AutomationProperties.Name="{Binding HarperText}"/>
+      <TextBlock Text="{Binding LlmText}" Margin="0,0,0,12" AutomationProperties.Name="{Binding LlmText}"/>
+
+      <TextBlock Text="Recent errors" FontWeight="SemiBold" Margin="0,0,0,6"
+                 AutomationProperties.Name="Recent errors"/>
+      <ListBox ItemsSource="{Binding RecentErrors}" Height="140"
+               AutomationProperties.Name="Recent errors list">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"/>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </StackPanel>
+  </DockPanel>
+</Window>

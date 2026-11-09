@@ -37,12 +37,27 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
     private long _droppedEvents;
     private int _lastSeenEventTick = Environment.TickCount;
     private int _lastReinstallTick;
+    private long _lastReinstallUtcTicks;
     private Timer? _watchdogTimer;
     private volatile bool _disposing;
     private CancellationTokenSource? _consumerCts;
     private Task? _consumerTask;
 
     public event EventHandler? HookStoppedUnexpectedly;
+
+    public bool IsHookInstalled => _hookHandle != 0;
+
+    /// <summary>UTC of the last successful reinstall, or null if never reinstalled.</summary>
+    public DateTimeOffset? LastReinstallUtc
+    {
+        get
+        {
+            var ticks = Interlocked.Read(ref _lastReinstallUtcTicks);
+            return ticks == 0 ? null : new DateTimeOffset(ticks, TimeSpan.Zero);
+        }
+    }
+
+    public long DroppedEventCount => Interlocked.Read(ref _droppedEvents);
 
     private static readonly HookProc HookProcDelegate = HookProcCallback;
 
@@ -267,6 +282,7 @@ public sealed class KeyboardHookService : IKeyboardEvents, IDisposable
             _logger.LogWarning("Keyboard hook reinstalled");
             Interlocked.Exchange(ref _lastSeenEventTick, Environment.TickCount);
             Interlocked.Exchange(ref _lastReinstallTick, Environment.TickCount);
+            Interlocked.Exchange(ref _lastReinstallUtcTicks, DateTimeOffset.UtcNow.UtcTicks);
         }
     }
 

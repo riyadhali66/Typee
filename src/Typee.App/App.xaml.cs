@@ -9,6 +9,7 @@ using Serilog;
 using Typee.App.Interop;
 using Typee.App.Services;
 using Typee.App.SingleInstance;
+using Typee.App.ViewModels;
 using Typee.Core;
 using Typee.Core.Abstractions;
 using Typee.Core.Reliability;
@@ -26,9 +27,11 @@ public partial class App : Application
     private IHost? _host;
     private SingleInstanceGuard? _singleInstance;
     private TrayIconHost? _trayIconHost;
+    private SuggestionOverlayService? _suggestionOverlay;
     private ServiceSupervisor? _hookSupervisor;
     private SystemEventMonitor? _systemEventMonitor;
     private static TrayIconHost? _trayForErrors;
+    private static IDiagnosticsCollector? _diagnosticsForErrors;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -90,6 +93,11 @@ public partial class App : Application
                     services.AddSingleton<HotkeyCoordinator>();
                     services.AddTypeePlatformWindows();
                     services.AddSingleton<CaretMarkerService>();
+                    services.AddSingleton<UiLanguageService>();
+                    services.AddSingleton<IDiagnosticsCollector, DiagnosticsCollector>();
+                    services.AddSingleton<SuggestionOverlayViewModel>();
+                    services.AddSingleton<ISuggestionOverlay>(sp => sp.GetRequiredService<SuggestionOverlayViewModel>());
+                    services.AddSingleton<SuggestionOverlayService>();
                     services.AddSingleton<TrayIconHost>();
                     services.AddSingleton<SystemEventMonitor>();
                 })
@@ -97,6 +105,9 @@ public partial class App : Application
 
             var settingsStore = _host.Services.GetRequiredService<ISettingsStore>();
             await settingsStore.LoadAsync().ConfigureAwait(true);
+
+            _ = _host.Services.GetRequiredService<UiLanguageService>();
+            _diagnosticsForErrors = _host.Services.GetRequiredService<IDiagnosticsCollector>();
 
             var keyboardHook = _host.Services.GetRequiredService<KeyboardHookService>();
             var loggerFactory = _host.Services.GetRequiredService<ILoggerFactory>();
@@ -110,9 +121,12 @@ public partial class App : Application
             keyboardHook.HookStoppedUnexpectedly += (_, _) =>
                 _hookSupervisor.NotifyStoppedUnexpectedly("hook thread exited");
             _hookSupervisor.GiveUp += (_, args) =>
+            {
+                _diagnosticsForErrors?.RecordError($"hook give-up:{args.FeatureName}");
                 _trayForErrors?.ShowWarningBalloon(
                     "Typee degraded",
                     $"Keyboard input ({args.FeatureName}) stopped after repeated failures.");
+            };
             _hookSupervisor.Restarting += (_, args) =>
                 _trayForErrors?.ShowWarningBalloon(
                     "Typee",
@@ -124,6 +138,7 @@ public partial class App : Application
             _host.Services.GetRequiredService<HotkeyCoordinator>()
                 .ApplyFromSettings(_host.Services.GetRequiredService<ISettingsStore>().Current);
 
+            _suggestionOverlay = _host.Services.GetRequiredService<SuggestionOverlayService>();
             _trayIconHost = _host.Services.GetRequiredService<TrayIconHost>();
             _trayForErrors = _trayIconHost;
 
@@ -156,8 +171,11 @@ public partial class App : Application
         _hookSupervisor = null;
 
         _trayForErrors = null;
+        _diagnosticsForErrors = null;
         _trayIconHost?.Dispose();
         _trayIconHost = null;
+        _suggestionOverlay?.Dispose();
+        _suggestionOverlay = null;
         _singleInstance?.Dispose();
         _singleInstance = null;
 
@@ -212,6 +230,7 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)
     {
         Log.Fatal(args.Exception, "Unhandled dispatcher exception");
+        _diagnosticsForErrors?.RecordError($"dispatcher:{args.Exception.GetType().Name}");
         _trayForErrors?.ShowWarningBalloon("Typee error", "A recoverable error occurred. Typee will keep running.");
         args.Handled = true;
     }
@@ -221,6 +240,7 @@ public partial class App : Application
         if (args.ExceptionObject is Exception ex)
         {
             Log.Fatal(ex, "Unhandled domain exception (terminating={IsTerminating})", args.IsTerminating);
+            _diagnosticsForErrors?.RecordError($"domain:{ex.GetType().Name}");
             _trayForErrors?.ShowWarningBalloon("Typee error", "A serious error occurred.");
         }
     }
@@ -228,6 +248,7 @@ public partial class App : Application
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs args)
     {
         Log.Fatal(args.Exception, "Unobserved task exception");
+        _diagnosticsForErrors?.RecordError($"task:{args.Exception.GetType().Name}");
         _trayForErrors?.ShowWarningBalloon("Typee error", "A background task failed.");
         args.SetObserved();
     }

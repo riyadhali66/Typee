@@ -17,7 +17,8 @@
     "minCharsBeforeSuggest": 12,
     "maxContextChars": 1500,
     "level1GrammarEnabled": true,
-    "level2CompletionEnabled": true
+    "level2CompletionEnabled": true,
+    "debugDummyOnPause": false
   },
   "grammar": {
     "engine": "harper",

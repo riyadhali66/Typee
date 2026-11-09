@@ -39,4 +39,11 @@
     <Resource Include="Assets\tray.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Hand-maintained Resources/Strings.cs; satellite Strings.ar.resx for Arabic scaffold. -->
+    <EmbeddedResource Update="Resources\Strings.ar.resx">
+      <DependentUpon>Strings.resx</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

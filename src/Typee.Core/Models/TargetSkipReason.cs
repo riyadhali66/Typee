@@ -6,5 +6,6 @@ public enum TargetSkipReason
     BlocklistedProcess,
     ElevatedTarget,
     PasswordField,
-    FullScreenPause
+    FullScreenPause,
+    OwnProcess
 }

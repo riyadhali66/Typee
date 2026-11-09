@@ -16,6 +16,8 @@ public sealed class FocusMonitor : IDisposable
     private nint _focusHook;
     private bool _disposed;
 
+    public event EventHandler? FocusChanged;
+
     public FocusMonitor(UiaElementCache cache, UiaThread uiaThread, ILogger<FocusMonitor> logger)
     {
         _cache = cache;
@@ -68,6 +70,7 @@ public sealed class FocusMonitor : IDisposable
         uint dwmsEventTime)
     {
         _cache.Invalidate();
+        FocusChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Dispose()
