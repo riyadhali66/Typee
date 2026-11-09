@@ -22,9 +22,13 @@ internal static partial class NativeMethods
     public const int WmAppReinstallHook = 0x8001;
 
     public const int WmWtsSessionChange = 0x02B1;
+    public const int WtsSessionLock = 0x7;
     public const int WtsSessionUnlock = 0x8;
     public const int WtsSessionLogon = 0x5;
     public const int NotifyForThisSession = 0;
+
+    public const uint DesktopReadObjects = 0x0001;
+    public const int UoiName = 2;
 
     public const int WmPowerBroadcast = 0x218;
     public const int PbtApmResumeAutomatic = 0x12;
@@ -242,6 +246,22 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetWindowRect(nint hWnd, out Rect lpRect);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint OpenInputDesktop(uint dwFlags, [MarshalAs(UnmanagedType.Bool)] bool fInherit, uint dwDesiredAccess);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseDesktop(nint hDesktop);
+
+    [LibraryImport("user32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetUserObjectInformationW(
+        nint hObj,
+        int nIndex,
+        nint pvInfo,
+        uint nLength,
+        out uint lpnLengthNeeded);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     internal delegate void WinEventProc(

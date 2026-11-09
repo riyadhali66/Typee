@@ -59,4 +59,40 @@ public sealed class HookWatchdogDecisionTests
 
         Assert.True(HookWatchdogDecision.ShouldReinstall(now, lastRaw, lastHook, lastReinstall));
     }
+
+    [Fact]
+    public void ShouldNotReinstall_WhenForegroundElevated()
+    {
+        const int now = 100_000;
+        Assert.False(HookWatchdogDecision.ShouldReinstall(
+            now,
+            lastRawKeyboardTick: now - 1_000,
+            lastHookTick: now - 6_000,
+            lastReinstallTick: now - 31_000,
+            foregroundElevatedOrUnknown: true));
+    }
+
+    [Fact]
+    public void ShouldNotReinstall_WhenSecureDesktopActive()
+    {
+        const int now = 100_000;
+        Assert.False(HookWatchdogDecision.ShouldReinstall(
+            now,
+            lastRawKeyboardTick: now - 1_000,
+            lastHookTick: now - 6_000,
+            lastReinstallTick: now - 31_000,
+            secureDesktopActive: true));
+    }
+
+    [Fact]
+    public void ShouldNotReinstall_WhenSessionLocked()
+    {
+        const int now = 100_000;
+        Assert.False(HookWatchdogDecision.ShouldReinstall(
+            now,
+            lastRawKeyboardTick: now - 1_000,
+            lastHookTick: now - 6_000,
+            lastReinstallTick: now - 31_000,
+            sessionLocked: true));
+    }
 }

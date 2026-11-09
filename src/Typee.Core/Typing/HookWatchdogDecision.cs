@@ -11,7 +11,8 @@ public static class HookWatchdogDecision
 
     /// <summary>
     /// Returns true when raw input saw a keyboard event in the last <see cref="RawRecentWindowMs"/>
-    /// but the hook did not, and the reinstall rate limit has elapsed.
+    /// but the hook did not, the reinstall rate limit has elapsed, and the environment is one
+    /// where the LL hook is expected to see keys (not elevated/secure-desktop/locked).
     /// Tick values use <see cref="Environment.TickCount"/> wrap-around arithmetic.
     /// </summary>
     public static bool ShouldReinstall(
@@ -19,9 +20,18 @@ public static class HookWatchdogDecision
         int lastRawKeyboardTick,
         int lastHookTick,
         int lastReinstallTick,
+        bool foregroundElevatedOrUnknown = false,
+        bool secureDesktopActive = false,
+        bool sessionLocked = false,
         int rawRecentWindowMs = RawRecentWindowMs,
         int minReinstallIntervalMs = MinReinstallIntervalMs)
     {
+        // LL hooks cannot observe elevated/secure-desktop/locked input; raw sink still can.
+        if (foregroundElevatedOrUnknown || secureDesktopActive || sessionLocked)
+        {
+            return false;
+        }
+
         var sinceReinstall = unchecked(nowTick - lastReinstallTick);
         if (sinceReinstall < minReinstallIntervalMs)
         {

@@ -79,6 +79,7 @@ public partial class App : Application
                     services.AddTypeeStorage();
                     services.AddSingleton<KeyboardInterceptionState>();
                     services.AddSingleton<IRawKeyboardActivityClock, RawKeyboardActivityClock>();
+                    services.AddSingleton<ISessionLockState, SessionLockState>();
                     services.AddSingleton<KeyboardHookService>();
                     services.AddSingleton<IKeyboardEvents>(sp => sp.GetRequiredService<KeyboardHookService>());
                     services.AddSingleton<IHotkeyService, HotkeyService>();

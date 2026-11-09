@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Phase 3 privacy: elevation unknown/missing PID, password property unknown/null, and mid-Invoke focus TOCTOU all fail closed via `TryGetSafeFocusedElement`.
 - Hook watchdog: Raw Input keyboard sink (`RIDEV_INPUTSINK`) timestamps only — replaces `GetLastInputInfo` mouse false positives.
+- Hook watchdog: skip reinstall when foreground is elevated, secure desktop is active, or the session is locked (LL hook cannot see those keys).
 
 ### Changed
 - Phase workflow: work on `phase/<n>-<name>` branches; push after every phase commit; tag checkpoints.
