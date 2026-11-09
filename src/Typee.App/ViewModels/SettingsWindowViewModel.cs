@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -7,22 +8,43 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Typee.App.Services;
 using Typee.Core.Abstractions;
+using Typee.Core.Models;
+using Typee.Core.Phrases;
 using Typee.Core.Settings;
 
 namespace Typee.App.ViewModels;
 
 public partial class SettingsWindowViewModel : ObservableObject
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly ISettingsStore _settingsStore;
     private readonly IAppPaths _paths;
+    private readonly IPhraseService _phrases;
+    private readonly IUserDictionaryRepository _dictionary;
+    private readonly ITypeeDatabase _database;
     private readonly ILogger _logger;
 
     private readonly Dictionary<string, (Func<string> Get, Action<string> Set)> _hotkeyEditors;
 
-    public SettingsWindowViewModel(ISettingsStore settingsStore, IAppPaths paths, ILogger logger)
+    public SettingsWindowViewModel(
+        ISettingsStore settingsStore,
+        IAppPaths paths,
+        IPhraseService phrases,
+        IUserDictionaryRepository dictionary,
+        ITypeeDatabase database,
+        ILogger logger)
     {
         _settingsStore = settingsStore;
         _paths = paths;
+        _phrases = phrases;
+        _dictionary = dictionary;
+        _database = database;
         _logger = logger;
 
         _hotkeyEditors = new Dictionary<string, (Func<string>, Action<string>)>(StringComparer.Ordinal)
@@ -38,6 +60,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         LoadFrom(settingsStore.Current);
         RefreshLoadNotices();
+        _ = RefreshLearnedDataAsync();
     }
 
     // --- Hotkeys tab ---
@@ -133,7 +156,31 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _loadNoticesText = string.Empty;
 
+    [ObservableProperty]
+    private int _completionCacheTtlHours = 168;
+
+    [ObservableProperty]
+    private string _storageSummary =
+        "settings.json / settings.backup.json (preferences only — API keys stay in environment variables); "
+        + "typee.db (phrases, dictionary, completion cache, snippets, custom commands, recent instructions, "
+        + "action profile memory, endpoint acknowledgments, caret method memory — process names only); "
+        + "logs\\ (counts and errors, never typed text); models\\ (downloaded speech models); crash.marker while running.";
+
     public ObservableCollection<string> UiLanguages { get; } = ["auto", "en", "ar"];
+    public ObservableCollection<PhraseRowViewModel> Phrases { get; } = [];
+    public ObservableCollection<DictionaryRowViewModel> DictionaryWords { get; } = [];
+
+    [ObservableProperty]
+    private string _newPhraseText = string.Empty;
+
+    [ObservableProperty]
+    private PhraseRowViewModel? _selectedPhrase;
+
+    [ObservableProperty]
+    private string _newDictionaryWord = string.Empty;
+
+    [ObservableProperty]
+    private DictionaryRowViewModel? _selectedDictionaryWord;
 
     // --- LLM tab ---
 
@@ -300,8 +347,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     private async Task ClearLearnedDataAsync()
     {
         if (MessageBox.Show(
-                "Clear learned data by resetting settings and removing logs?\n\n"
-                + "SQLite learned data (Phase 5) is not deleted yet.",
+                "Clear all learned data from typee.db?\n\n"
+                + "This removes phrases, dictionary words, completion cache, recent instructions, "
+                + "action/profile memory, endpoint acknowledgments, and caret method memory.\n"
+                + "Snippets, custom commands, settings, and logs are kept.",
                 "Typee — Clear learned data",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
@@ -309,15 +358,27 @@ public partial class SettingsWindowViewModel : ObservableObject
             return;
         }
 
-        await ClearLocalUserDataAsync(includeSettings: true).ConfigureAwait(true);
+        try
+        {
+            await _database.ClearLearnedDataAsync().ConfigureAwait(true);
+            await RefreshLearnedDataAsync().ConfigureAwait(true);
+            StatusMessage = "Learned data cleared";
+            _logger.LogInformation("Cleared learned SQLite data from Privacy tab");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Clear learned data failed — see logs";
+            _logger.LogError(ex, "Failed to clear learned data");
+        }
     }
 
     [RelayCommand]
     private async Task DeleteAllDataAsync()
     {
         if (MessageBox.Show(
-                "Delete all Typee data under %LOCALAPPDATA%\\Typee (settings, logs, crash marker)?\n\n"
-                + "Database wipe arrives in Phase 5.",
+                "Delete ALL Typee data under %LOCALAPPDATA%\\Typee?\n\n"
+                + "This removes settings, typee.db (including snippets/commands), logs, crash marker, "
+                + "and reloads defaults. API keys in environment variables are untouched.",
                 "Typee — Delete all data",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning) != MessageBoxResult.Yes)
@@ -325,10 +386,238 @@ public partial class SettingsWindowViewModel : ObservableObject
             return;
         }
 
-        await ClearLocalUserDataAsync(includeSettings: true).ConfigureAwait(true);
-        await _settingsStore.ResetToDefaultsAsync().ConfigureAwait(true);
-        LoadFrom(_settingsStore.Current);
-        StatusMessage = "Local data cleared";
+        try
+        {
+            await _database.DeleteDatabaseAsync().ConfigureAwait(true);
+            await ClearLocalUserDataAsync(includeSettings: true).ConfigureAwait(true);
+            await _settingsStore.ResetToDefaultsAsync().ConfigureAwait(true);
+            LoadFrom(_settingsStore.Current);
+            await RefreshLearnedDataAsync().ConfigureAwait(true);
+            StatusMessage = "All local Typee data deleted";
+            _logger.LogInformation("Deleted all local Typee data from Privacy tab");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Delete all data failed — see logs";
+            _logger.LogError(ex, "Failed to delete all Typee data");
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddPhraseAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewPhraseText))
+        {
+            return;
+        }
+
+        try
+        {
+            await _phrases.AddManualAsync(NewPhraseText).ConfigureAwait(true);
+            NewPhraseText = string.Empty;
+            await RefreshPhrasesAsync().ConfigureAwait(true);
+            StatusMessage = "Phrase added";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Add phrase failed — see logs";
+            _logger.LogError(ex, "Failed to add phrase");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeletePhraseAsync()
+    {
+        if (SelectedPhrase is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _phrases.DeleteAsync(SelectedPhrase.Id).ConfigureAwait(true);
+            await RefreshPhrasesAsync().ConfigureAwait(true);
+            StatusMessage = "Phrase deleted";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Delete phrase failed — see logs";
+            _logger.LogError(ex, "Failed to delete phrase id={PhraseId}", SelectedPhrase.Id);
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportPhrasesAsync()
+    {
+        var dialog = new SaveFileDialog { Filter = "JSON (*.json)|*.json", FileName = "typee-phrases.json" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var all = await _phrases.GetAllAsync().ConfigureAwait(true);
+            var dto = all.Select(static p => new PhraseExportDto
+            {
+                Text = p.Text,
+                TriggerPrefix = p.TriggerPrefix,
+                UseCount = p.UseCount,
+                Source = p.Source.ToString().ToLowerInvariant()
+            }).ToList();
+            await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(dto, JsonOptions)).ConfigureAwait(true);
+            StatusMessage = $"Exported {dto.Count} phrases";
+            _logger.LogInformation("Exported phrases count={Count}", dto.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Export phrases failed — see logs";
+            _logger.LogError(ex, "Failed to export phrases");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportPhrasesAsync()
+    {
+        var dialog = new OpenFileDialog { Filter = "JSON (*.json)|*.json" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(dialog.FileName).ConfigureAwait(true);
+            var dto = JsonSerializer.Deserialize<List<PhraseExportDto>>(json, JsonOptions) ?? [];
+            var phrases = dto
+                .Where(static d => !string.IsNullOrWhiteSpace(d.Text))
+                .Select(static d => new Phrase
+                {
+                    Text = d.Text.Trim(),
+                    TriggerPrefix = string.IsNullOrWhiteSpace(d.TriggerPrefix)
+                        ? PhraseTrie.DeriveTriggerPrefix(d.Text)
+                        : d.TriggerPrefix.Trim(),
+                    UseCount = Math.Max(0, d.UseCount),
+                    Source = string.Equals(d.Source, "accepted", StringComparison.OrdinalIgnoreCase)
+                        ? PhraseSource.Accepted
+                        : PhraseSource.Manual
+                });
+            await _phrases.ImportAsync(phrases).ConfigureAwait(true);
+            await RefreshPhrasesAsync().ConfigureAwait(true);
+            StatusMessage = "Phrases imported";
+            _logger.LogInformation("Imported phrases from file");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Import phrases failed — see logs";
+            _logger.LogError(ex, "Failed to import phrases");
+        }
+    }
+
+    [RelayCommand]
+    private async Task AddDictionaryWordAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewDictionaryWord))
+        {
+            return;
+        }
+
+        try
+        {
+            await _dictionary.UpsertAsync(NewDictionaryWord.Trim(), DateTimeOffset.UtcNow).ConfigureAwait(true);
+            NewDictionaryWord = string.Empty;
+            await RefreshDictionaryAsync().ConfigureAwait(true);
+            StatusMessage = "Dictionary word added";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Add dictionary word failed — see logs";
+            _logger.LogError(ex, "Failed to add dictionary word");
+        }
+    }
+
+    [RelayCommand]
+    private async Task DeleteDictionaryWordAsync()
+    {
+        if (SelectedDictionaryWord is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var word = SelectedDictionaryWord.Word;
+            await _dictionary.DeleteAsync(word).ConfigureAwait(true);
+            await RefreshDictionaryAsync().ConfigureAwait(true);
+            StatusMessage = "Dictionary word deleted";
+            _logger.LogInformation("Deleted dictionary word");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Delete dictionary word failed — see logs";
+            _logger.LogError(ex, "Failed to delete dictionary word");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ExportDictionaryAsync()
+    {
+        var dialog = new SaveFileDialog { Filter = "JSON (*.json)|*.json", FileName = "typee-dictionary.json" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var all = await _dictionary.GetAllAsync().ConfigureAwait(true);
+            var dto = all.Select(static w => new DictionaryExportDto { Word = w.Word }).ToList();
+            await File.WriteAllTextAsync(dialog.FileName, JsonSerializer.Serialize(dto, JsonOptions)).ConfigureAwait(true);
+            StatusMessage = $"Exported {dto.Count} dictionary words";
+            _logger.LogInformation("Exported dictionary count={Count}", dto.Count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Export dictionary failed — see logs";
+            _logger.LogError(ex, "Failed to export dictionary");
+        }
+    }
+
+    [RelayCommand]
+    private async Task ImportDictionaryAsync()
+    {
+        var dialog = new OpenFileDialog { Filter = "JSON (*.json)|*.json" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(dialog.FileName).ConfigureAwait(true);
+            var dto = JsonSerializer.Deserialize<List<DictionaryExportDto>>(json, JsonOptions) ?? [];
+            var now = DateTimeOffset.UtcNow;
+            var count = 0;
+            foreach (var item in dto)
+            {
+                if (string.IsNullOrWhiteSpace(item.Word))
+                {
+                    continue;
+                }
+
+                await _dictionary.UpsertAsync(item.Word.Trim(), now).ConfigureAwait(true);
+                count++;
+            }
+
+            await RefreshDictionaryAsync().ConfigureAwait(true);
+            StatusMessage = $"Imported {count} dictionary words";
+            _logger.LogInformation("Imported dictionary count={Count}", count);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Import dictionary failed — see logs";
+            _logger.LogError(ex, "Failed to import dictionary");
+        }
     }
 
     [RelayCommand]
@@ -364,6 +653,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         MaxContextChars = settings.Suggestions.MaxContextChars;
         Level1GrammarEnabled = settings.Suggestions.Level1GrammarEnabled;
         Level2CompletionEnabled = settings.Suggestions.Level2CompletionEnabled;
+        CompletionCacheTtlHours = settings.Suggestions.CompletionCacheTtlHours;
 
         GrammarDialect = settings.Grammar.Dialect;
         LlmDeepCheck = settings.Grammar.LlmDeepCheck;
@@ -404,6 +694,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         settings.Suggestions.MaxContextChars = MaxContextChars;
         settings.Suggestions.Level1GrammarEnabled = Level1GrammarEnabled;
         settings.Suggestions.Level2CompletionEnabled = Level2CompletionEnabled;
+        settings.Suggestions.CompletionCacheTtlHours = CompletionCacheTtlHours;
 
         settings.Grammar.Dialect = GrammarDialect;
         settings.Grammar.LlmDeepCheck = LlmDeepCheck;
@@ -473,6 +764,46 @@ public partial class SettingsWindowViewModel : ObservableObject
         }
     }
 
+    private async Task RefreshLearnedDataAsync()
+    {
+        await RefreshPhrasesAsync().ConfigureAwait(true);
+        await RefreshDictionaryAsync().ConfigureAwait(true);
+    }
+
+    private async Task RefreshPhrasesAsync()
+    {
+        try
+        {
+            var all = await _phrases.GetAllAsync().ConfigureAwait(true);
+            Phrases.Clear();
+            foreach (var phrase in all)
+            {
+                Phrases.Add(new PhraseRowViewModel(phrase));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to refresh phrases list");
+        }
+    }
+
+    private async Task RefreshDictionaryAsync()
+    {
+        try
+        {
+            var all = await _dictionary.GetAllAsync().ConfigureAwait(true);
+            DictionaryWords.Clear();
+            foreach (var word in all)
+            {
+                DictionaryWords.Add(new DictionaryRowViewModel(word));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to refresh dictionary list");
+        }
+    }
+
     private static List<string> SplitList(string text, params char[] separators)
     {
         return text
@@ -480,5 +811,18 @@ public partial class SettingsWindowViewModel : ObservableObject
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private sealed class PhraseExportDto
+    {
+        public string Text { get; set; } = string.Empty;
+        public string TriggerPrefix { get; set; } = string.Empty;
+        public int UseCount { get; set; }
+        public string Source { get; set; } = "manual";
+    }
+
+    private sealed class DictionaryExportDto
+    {
+        public string Word { get; set; } = string.Empty;
     }
 }

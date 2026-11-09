@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/4-suggestion-overlay` |
-| Last completed | Phase 4 suggestion overlay + diagnostics + resx scaffold |
-| Next task | Merge Phase 4 → main; then Phase 5 → Checkpoint B |
+| Current branch | `phase/5-sqlite-storage` |
+| Last completed | Phase 5 SQLite storage, phrases, privacy wipe |
+| Next task | Merge Phase 5 → main; then Phase 6 Harper → Checkpoint B path |
 | Half-done | None |
 | Uncommitted risks | None |
 | Updated | 2026-11-09 (Cursor) |
@@ -23,8 +23,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 1+ — Hardening now (crash/settings/DLL) | [x] merged to main | §9 now |
 | 2 — Keyboard hook + hotkeys | [x] merged; raw-input watchdog on main; soak [x] | d3251d8 |
 | 3 — Caret tracking + UIA text context | [x] merged; Checkpoint A partial | fabc808 / tag `checkpoint-a` |
-| 4 — Suggestion overlay | [x] code done; manual matrix deferred | (this branch) |
-| 5 — SQLite storage (all tables incl. 8E/8F) | [ ] | |
+| 4 — Suggestion overlay | [x] merged to main | 1e6e4cc |
+| 5 — SQLite storage (all tables incl. 8E/8F) | [x] code done | (this branch) |
 | 6 — Harper grammar | [ ] | |
 | 7 — Pipeline + LLM + consent | [ ] | |
 | 8 — Text insertion + focus snapshot | [ ] | |
@@ -76,7 +76,7 @@ Verified: `dotnet build -c Release` 0 warnings/0 errors; `dotnet test` green. No
 - [x] §9.7 Settings Export / Import (keys excluded) / Reset to defaults
 - [x] §9.8 `SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS)` at startup
 - [x] §9.8 `%LOCALAPPDATA%\Typee` created with default per-user permissions only
-- [x] §9.8 Privacy tab: Clear learned data / Delete all Typee data + storage summary (DB wipe deferred Phase 5)
+- [x] §9.8 Privacy tab: Clear learned data / Delete all Typee data + storage summary (DB wipe completed in Phase 5)
 
 ---
 
@@ -138,7 +138,7 @@ Tasks:
 ### Phase 3
 - [ ] Display-change → refresh monitor/DPI cache (overlays later)
 - [ ] `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
-- [ ] Per-process caret method memory in `typee.db` (process names only)
+- [x] Per-process caret method memory in `typee.db` (process names only) — Phase 5
 - [ ] Clipboard full-format preserve/restore (with Phase 8 inserter)
 
 ### Phase 4
@@ -198,7 +198,7 @@ Status: **partially verified — logs clean confirmed by agent, manual app tests
 
 - Display-change → refresh monitor/DPI cache (overlays in Phase 4)
 - `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
-- Per-process caret method memory in `typee.db`
+- [x] Per-process caret method memory in `typee.db` — Phase 5
 
 ## Phase 4 — Suggestion overlay — DONE (code)
 
@@ -223,12 +223,26 @@ Tasks:
 - [!] Trim does **not** swallow printable keys (only Tab/Esc): typed chars go to the host while the card shortens — correct for completion UX without Phase 8 insertion
 - [!] `tests/Typee.TestHost` still deferred (Phase 3 list)
 
-## Phase 5 — SQLite storage — TODO
+## Phase 5 — SQLite storage — DONE (code)
 
-- [ ] Migrations table + runner; ALL tables now: phrases, completion_cache, user_dictionary, snippets, custom_commands, recent_instructions, action_profile_memory, endpoint_acknowledgments
-- [ ] Repositories + settings-backed TTL; phrase trie (prefix, 1–5 words, rank by use+recency)
-- [ ] Settings tabs "My phrases", "My dictionary" (CRUD + import/export JSON)
-- [ ] Accept-count logic (increment; insert as accepted after 3 accepts); tests
+Built: `%LOCALAPPDATA%\Typee\typee.db` via `MigrationRunner` + `schema_migrations`; tables `phrases`, `completion_cache`, `user_dictionary`, `snippets`, `custom_commands`, `recent_instructions`, `action_profile_memory`, `endpoint_acknowledgments`, `caret_method_memory`. Repositories (Dapper) + `suggestions.completionCacheTtlHours` (default 168). `PhraseTrie` + `PhraseService` (match last 1–5 words; rank use_count + recency; accept-count → insert after 3). Settings tabs **My phrases** / **My dictionary** (CRUD + JSON import/export). Privacy: Clear learned data / Delete all Typee data with plain-language storage summary. `CaretLocator` persists process name + method enum only on success (and prefers remembered method).
+
+Tasks:
+- [x] Migrations table + runner; ALL tables now (incl. 8E/8F + caret_method_memory)
+- [x] Repositories + settings-backed TTL; phrase trie (prefix, 1–5 words, rank by use+recency)
+- [x] Settings tabs "My phrases", "My dictionary" (CRUD + import/export JSON)
+- [x] Accept-count logic (increment; insert as accepted after 3 accepts)
+- [x] Privacy Clear learned / Delete all wired to SQLite
+- [x] Persist caret method memory from CaretLocator success path
+- [x] Unit tests: migrations, phrase trie, accept-count, repositories
+- [x] Gate: `dotnet build` / `dotnet test` Release — 0 warnings, 0 errors
+
+### Phase 5 deferred / notes
+
+- [!] Phrase learning from live Tab-accept is not wired to the overlay yet (needs Phase 7/8 suggestion accept path); `IPhraseService.RecordAcceptAsync` is ready
+- [!] Completion-cache TTL purge is available via repository; periodic sweep lands with Phase 7 pipeline
+- [!] Snippets / custom commands Settings UI deferred to Phase 8E (tables + repos ready)
+- [!] `tests/Typee.TestHost` still deferred
 
 ## Phase 6 — Harper grammar — TODO
 

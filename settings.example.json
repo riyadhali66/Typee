@@ -18,6 +18,7 @@
     "maxContextChars": 1500,
     "level1GrammarEnabled": true,
     "level2CompletionEnabled": true,
+    "completionCacheTtlHours": 168,
     "debugDummyOnPause": false
   },
   "grammar": {

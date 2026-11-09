@@ -95,6 +95,9 @@ public sealed class SuggestionSettings
     public bool Level1GrammarEnabled { get; set; } = true;
     public bool Level2CompletionEnabled { get; set; } = true;
 
+    /// <summary>TTL for completion_cache rows (hours). Default 7 days.</summary>
+    public int CompletionCacheTtlHours { get; set; } = 168;
+
     /// <summary>Debug: show a dummy suggestion on each typing pause (Phase 4 manual testing).</summary>
     public bool DebugDummyOnPause { get; set; }
 }
