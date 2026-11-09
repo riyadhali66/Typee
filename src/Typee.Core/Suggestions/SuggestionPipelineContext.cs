@@ -1,3 +1,4 @@
+using Typee.Core.Insertion;
 using Typee.Core.Models;
 using Typee.Core.Settings;
 
@@ -11,6 +12,9 @@ public sealed class SuggestionPipelineContext
     public required TextContext Text { get; init; }
     public required AppSettings Settings { get; init; }
     public required CaretLocation? Caret { get; init; }
+
+    /// <summary>Foreground/focused-element identity captured at pipeline start (Phase 8 verification).</summary>
+    public FocusIdentity Target { get; init; }
 
     /// <summary>True when consent accepted, rate guard allows, and endpoint policy permits LLM.</summary>
     public bool LlmAllowed { get; init; }

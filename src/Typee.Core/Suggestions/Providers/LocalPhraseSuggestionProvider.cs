@@ -1,4 +1,5 @@
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Models;
 
 namespace Typee.Core.Suggestions.Providers;
@@ -39,6 +40,7 @@ public sealed class LocalPhraseSuggestionProvider : ISuggestionProvider
             return Task.FromResult<Suggestion?>(null);
         }
 
+        var mode = TextInsertPlanFactory.ParseMode(context.Settings.Suggestions.InsertMode);
         Suggestion suggestion = new()
         {
             HeaderKey = "Suggestion_Completion",
@@ -49,7 +51,8 @@ public sealed class LocalPhraseSuggestionProvider : ISuggestionProvider
             Kind = SuggestionKind.Completion,
             Level = SuggestionLevel.Local,
             AnchorCaret = context.Caret?.CaretRect,
-            Monitor = context.Caret?.Monitor
+            Monitor = context.Caret?.Monitor,
+            Insert = TextInsertPlanFactory.ForAppend(context.Text, completion, context.Target, mode)
         };
 
         return Task.FromResult<Suggestion?>(suggestion);

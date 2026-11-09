@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Typee.App.Resources;
 using Typee.Core.Abstractions;
 using Typee.Core.Input;
+using Typee.Core.Insertion;
 using Typee.Core.Models;
 using Typee.Core.Suggestions;
 using Typee.Core.Typing;
@@ -52,7 +53,7 @@ public sealed partial class SuggestionOverlayViewModel : ObservableObject, ISugg
 
     public event EventHandler? VisibilityChanged;
 
-    public event EventHandler? Accepted;
+    public event EventHandler<SuggestionAcceptedEventArgs>? Accepted;
 
     public void Show(Suggestion suggestion)
     {
@@ -110,19 +111,17 @@ public sealed partial class SuggestionOverlayViewModel : ObservableObject, ISugg
 
         if (virtualKey == VirtualKeys.Tab)
         {
-            Accepted?.Invoke(this, EventArgs.Empty);
-            Hide();
+            Accept(optionIndex: 0);
             return true;
         }
 
-        // Alt+1/2/3 selects a grammar option (Phase 4: accept/dismiss only; insert is Phase 8).
+        // Alt+1/2/3 selects a grammar option and inserts via ITextInserter (Phase 8).
         if ((modifiers & KeyModifiers.Alt) != 0 && virtualKey is >= 0x31 and <= 0x33)
         {
             var index = virtualKey - 0x31;
             if (index < Options.Count)
             {
-                Accepted?.Invoke(this, EventArgs.Empty);
-                Hide();
+                Accept(optionIndex: index);
                 return true;
             }
         }
@@ -156,6 +155,38 @@ public sealed partial class SuggestionOverlayViewModel : ObservableObject, ISugg
     }
 
     public void ApplyFlowDirection(FlowDirection direction) => FlowDirection = direction;
+
+    private void Accept(int optionIndex)
+    {
+        var suggestion = Current;
+        if (suggestion is null)
+        {
+            Hide();
+            return;
+        }
+
+        var insertText = suggestion.Insert?.ResolveInsertText(optionIndex)
+                         ?? (optionIndex < suggestion.Options.Count
+                             ? suggestion.Options[optionIndex]
+                             : suggestion.PrimaryText);
+
+        // Capture remaining completion text if the user trimmed via printable keys.
+        if (suggestion.Kind is SuggestionKind.Completion
+            && suggestion.Insert?.Action == TextInsertAction.AppendAtCaret
+            && !string.IsNullOrEmpty(_remainingPrimary)
+            && (suggestion.Insert.InsertOptions.Count == 0 || optionIndex == 0))
+        {
+            insertText = _remainingPrimary;
+        }
+
+        Accepted?.Invoke(this, new SuggestionAcceptedEventArgs
+        {
+            Suggestion = suggestion,
+            InsertText = insertText,
+            OptionIndex = optionIndex
+        });
+        Hide();
+    }
 
     private void SyncSwallowFlags()
     {

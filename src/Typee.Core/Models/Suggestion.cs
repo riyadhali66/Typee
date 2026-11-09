@@ -1,7 +1,9 @@
+using Typee.Core.Insertion;
+
 namespace Typee.Core.Models;
 
 /// <summary>
-/// A floating overlay suggestion. Contains replacement text for display only — never logged.
+/// A floating overlay suggestion. Contains replacement text for display/insert — never logged.
 /// </summary>
 public sealed class Suggestion
 {
@@ -31,4 +33,7 @@ public sealed class Suggestion
     public ScreenRect? AnchorCaret { get; init; }
 
     public MonitorInfo? Monitor { get; init; }
+
+    /// <summary>How Tab/Alt+n should insert into the host document (Phase 8). Never log.</summary>
+    public TextInsertPlan? Insert { get; init; }
 }

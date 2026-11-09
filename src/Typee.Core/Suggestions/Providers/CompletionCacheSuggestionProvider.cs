@@ -1,4 +1,5 @@
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Llm;
 using Typee.Core.Models;
 
@@ -33,6 +34,7 @@ public sealed class CompletionCacheSuggestionProvider : ISuggestionProvider
             return null;
         }
 
+        var mode = TextInsertPlanFactory.ParseMode(context.Settings.Suggestions.InsertMode);
         return new Suggestion
         {
             HeaderKey = "Suggestion_Completion",
@@ -43,7 +45,8 @@ public sealed class CompletionCacheSuggestionProvider : ISuggestionProvider
             Kind = SuggestionKind.Completion,
             Level = SuggestionLevel.Local,
             AnchorCaret = context.Caret?.CaretRect,
-            Monitor = context.Caret?.Monitor
+            Monitor = context.Caret?.Monitor,
+            Insert = TextInsertPlanFactory.ForAppend(context.Text, entry.Suggestion, context.Target, mode)
         };
     }
 }

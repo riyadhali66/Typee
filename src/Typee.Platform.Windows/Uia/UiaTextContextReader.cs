@@ -88,11 +88,12 @@ public sealed class UiaTextContextReader : ITextContextReader
 
             try
             {
-                var doc = pattern.DocumentRange;
-                var range = doc.Clone();
-                range.MoveEndpointByRange(TextPatternRangeEndpoint.TextPatternRangeEndpoint_Start, doc, TextPatternRangeEndpoint.TextPatternRangeEndpoint_Start);
-                range.MoveEndpointByUnit(TextPatternRangeEndpoint.TextPatternRangeEndpoint_End, TextUnit.TextUnit_Character, span.Start);
-                range.MoveEndpointByUnit(TextPatternRangeEndpoint.TextPatternRangeEndpoint_End, TextUnit.TextUnit_Character, span.Length);
+                var range = CreateRange(pattern, span);
+                if (range is null)
+                {
+                    return false;
+                }
+
                 range.Select();
                 _logger.LogDebug("Selected character range ({Start},{Length})", span.Start, span.Length);
                 return true;
@@ -100,6 +101,85 @@ public sealed class UiaTextContextReader : ITextContextReader
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "TrySelect failed");
+                return false;
+            }
+        });
+    }
+
+    public string? TryReadSpanText(TextSpan span)
+    {
+        if (_guard.GetSkipReason() is not null)
+        {
+            return null;
+        }
+
+        return _uiaThread.Invoke(automation =>
+        {
+            if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null || element is null)
+            {
+                return null;
+            }
+
+            var pattern = UiaPatternHelper.TryGetTextPattern(element);
+            if (pattern is null)
+            {
+                return null;
+            }
+
+            try
+            {
+                var range = CreateRange(pattern, span);
+                if (range is null)
+                {
+                    return null;
+                }
+
+                // Never log the returned text.
+                return range.GetText(span.Length < 0 ? -1 : span.Length) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "TryReadSpanText failed");
+                return null;
+            }
+        });
+    }
+
+    public bool TrySetCaretOffset(int caretOffset)
+    {
+        if (caretOffset < 0 || _guard.GetSkipReason() is not null)
+        {
+            return false;
+        }
+
+        return _uiaThread.Invoke(automation =>
+        {
+            if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null || element is null)
+            {
+                return false;
+            }
+
+            var pattern = UiaPatternHelper.TryGetTextPattern(element);
+            if (pattern is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var range = CreateRange(pattern, new TextSpan(caretOffset, 0));
+                if (range is null)
+                {
+                    return false;
+                }
+
+                range.Select();
+                _logger.LogDebug("Set caret offset={Offset}", caretOffset);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "TrySetCaretOffset failed");
                 return false;
             }
         });
@@ -173,12 +253,31 @@ public sealed class UiaTextContextReader : ITextContextReader
     {
         try
         {
-            var range = pattern.DocumentRange.Clone();
-            range.MoveEndpointByUnit(TextPatternRangeEndpoint.TextPatternRangeEndpoint_Start, TextUnit.TextUnit_Character, span.Start);
-            range.MoveEndpointByUnit(TextPatternRangeEndpoint.TextPatternRangeEndpoint_End, TextUnit.TextUnit_Character, span.Start);
+            var doc = pattern.DocumentRange;
+            var range = doc.Clone();
+            // Collapse to document start, then walk both endpoints to [start, start+length).
+            range.MoveEndpointByRange(
+                TextPatternRangeEndpoint.TextPatternRangeEndpoint_End,
+                doc,
+                TextPatternRangeEndpoint.TextPatternRangeEndpoint_Start);
+            if (span.Start > 0)
+            {
+                range.MoveEndpointByUnit(
+                    TextPatternRangeEndpoint.TextPatternRangeEndpoint_Start,
+                    TextUnit.TextUnit_Character,
+                    span.Start);
+                range.MoveEndpointByUnit(
+                    TextPatternRangeEndpoint.TextPatternRangeEndpoint_End,
+                    TextUnit.TextUnit_Character,
+                    span.Start);
+            }
+
             if (span.Length > 0)
             {
-                range.MoveEndpointByUnit(TextPatternRangeEndpoint.TextPatternRangeEndpoint_End, TextUnit.TextUnit_Character, span.Length);
+                range.MoveEndpointByUnit(
+                    TextPatternRangeEndpoint.TextPatternRangeEndpoint_End,
+                    TextUnit.TextUnit_Character,
+                    span.Length);
             }
 
             return range;

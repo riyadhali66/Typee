@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Llm;
 using Typee.Core.Models;
 using Typee.Core.Settings;
@@ -18,6 +19,7 @@ public sealed class SuggestionPipelineService
     private readonly ITextContextReader _textReader;
     private readonly ICaretLocator _caretLocator;
     private readonly ITargetContextGuard _guard;
+    private readonly IFocusSnapshotService? _focusSnapshots;
     private readonly ILlmClient? _llm;
     private readonly ILogger<SuggestionPipelineService> _logger;
 
@@ -29,7 +31,8 @@ public sealed class SuggestionPipelineService
         ICaretLocator caretLocator,
         ITargetContextGuard guard,
         ILogger<SuggestionPipelineService> logger,
-        ILlmClient? llm = null)
+        ILlmClient? llm = null,
+        IFocusSnapshotService? focusSnapshots = null)
     {
         _router = router;
         _coordinator = coordinator;
@@ -39,6 +42,7 @@ public sealed class SuggestionPipelineService
         _guard = guard;
         _logger = logger;
         _llm = llm;
+        _focusSnapshots = focusSnapshots;
     }
 
     public SuggestionRequestCoordinator Coordinator => _coordinator;
@@ -87,12 +91,14 @@ public sealed class SuggestionPipelineService
             var llmAllowed = settings.Privacy.LlmConsentAccepted
                              && LlmEndpointPolicy.IsAllowed(settings.Llm.BaseUrl)
                              && (_llm?.IsOnline ?? false);
+            var target = _focusSnapshots?.CaptureIdentity() ?? FocusIdentity.Empty;
 
             var context = new SuggestionPipelineContext
             {
                 Text = text,
                 Settings = settings,
                 Caret = caret,
+                Target = target,
                 LlmAllowed = llmAllowed
             };
 

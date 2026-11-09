@@ -1,4 +1,5 @@
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Models;
 using Typee.Core.Text;
 
@@ -52,6 +53,8 @@ public sealed class GrammarSuggestionProvider : ISuggestionProvider
 
         var primary = options[0];
         SplitAroundChange(paragraph, primary, out var prefix, out var highlight, out var suffix);
+        var mode = TextInsertPlanFactory.ParseMode(context.Settings.Suggestions.InsertMode);
+        var insert = TextInsertPlanFactory.ForGrammarIssue(context.Text, issue, options, context.Target, mode);
 
         return new Suggestion
         {
@@ -64,7 +67,8 @@ public sealed class GrammarSuggestionProvider : ISuggestionProvider
             Kind = SuggestionKind.GrammarFix,
             Level = SuggestionLevel.Grammar,
             AnchorCaret = context.Caret?.CaretRect,
-            Monitor = context.Caret?.Monitor
+            Monitor = context.Caret?.Monitor,
+            Insert = insert
         };
     }
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Llm;
 using Typee.Core.Models;
 
@@ -97,6 +98,8 @@ public sealed class LlmStyleCheckSuggestionProvider : ISuggestionProvider
 
         context.GrammarIssueFound = true;
         var corrected = parsed.Corrected.Trim();
+        var mode = TextInsertPlanFactory.ParseMode(context.Settings.Suggestions.InsertMode);
+        var insert = TextInsertPlanFactory.ForWholeParagraphReplace(context.Text, corrected, context.Target, mode);
 
         return new Suggestion
         {
@@ -109,7 +112,8 @@ public sealed class LlmStyleCheckSuggestionProvider : ISuggestionProvider
             Kind = SuggestionKind.GrammarFix,
             Level = SuggestionLevel.Grammar,
             AnchorCaret = context.Caret?.CaretRect,
-            Monitor = context.Caret?.Monitor
+            Monitor = context.Caret?.Monitor,
+            Insert = insert
         };
     }
 }
