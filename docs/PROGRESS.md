@@ -8,11 +8,11 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `main` @ `fabc808` (includes `d3251d8` raw-input watchdog + Phase 3) |
-| Last completed | Pushed hardening + Phase 3 onto `origin/main` |
-| Next task | Checkpoint A filled results → then Phase 4 overlay |
-| Half-done | Checkpoint A — template received blank; not marked passed |
-| Uncommitted risks | Watchdog may reinstall when foreground is elevated (raw sink sees keys; LL hook does not) |
+| Current branch | `main` (tag `checkpoint-a`) |
+| Last completed | Checkpoint A partially verified — logs clean; manual app tests deferred to B |
+| Next task | `fix/watchdog-elevated`, then Phases 4 → 8 to Checkpoint B |
+| Half-done | None |
+| Uncommitted risks | None |
 | Updated | 2026-11-09 (Cursor) |
 
 ## Phase status
