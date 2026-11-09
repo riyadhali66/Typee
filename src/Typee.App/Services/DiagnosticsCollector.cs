@@ -11,6 +11,7 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
     private const int MaxErrors = 20;
 
     private readonly KeyboardHookService _hook;
+    private readonly IGrammarChecker? _grammar;
     private readonly object _gate = new();
     private readonly Queue<string> _errors = new();
     private readonly Process _process = Process.GetCurrentProcess();
@@ -20,9 +21,10 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
     private string _caretMethod = "—";
     private string? _foregroundProcess;
 
-    public DiagnosticsCollector(KeyboardHookService hook)
+    public DiagnosticsCollector(KeyboardHookService hook, IGrammarChecker? grammar = null)
     {
         _hook = hook;
+        _grammar = grammar;
         _lastCpu = _process.TotalProcessorTime;
     }
 
@@ -90,7 +92,7 @@ public sealed class DiagnosticsCollector : IDiagnosticsCollector
             HookDroppedEvents = _hook.DroppedEventCount,
             CaretMethod = process is null ? caret : $"{caret} ({process})",
             ForegroundProcess = process,
-            HarperStatus = "Not started (Phase 6)",
+            HarperStatus = _grammar?.Status ?? "Not started",
             LlmStatus = "Not started (Phase 7)",
             RecentErrors = errors
         };

@@ -39,6 +39,13 @@
     <Resource Include="Assets\tray.png" />
   </ItemGroup>
 
+  <!-- Harper binary from tools/fetch-harper.ps1 (gitignored). Copy when present. -->
+  <ItemGroup Condition="Exists('runtimes\harper\harper-ls.exe')">
+    <None Include="runtimes\harper\harper-ls.exe" CopyToOutputDirectory="PreserveNewest" LinkBase="runtimes\harper" />
+    <None Include="runtimes\harper\LICENSE" CopyToOutputDirectory="PreserveNewest" LinkBase="runtimes\harper" Condition="Exists('runtimes\harper\LICENSE')" />
+    <None Include="runtimes\harper\README.txt" CopyToOutputDirectory="PreserveNewest" LinkBase="runtimes\harper" Condition="Exists('runtimes\harper\README.txt')" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- Hand-maintained Resources/Strings.cs; satellite Strings.ar.resx for Arabic scaffold. -->
     <EmbeddedResource Update="Resources\Strings.ar.resx">

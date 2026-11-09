@@ -151,6 +151,20 @@ public sealed class TrayIconHost : IDisposable
         });
     }
 
+    /// <summary>Called from App when grammar (or another subsystem) degrades.</summary>
+    public void SetDegradedTooltip(string tooltip)
+    {
+        if (_disposed || string.IsNullOrWhiteSpace(tooltip))
+        {
+            return;
+        }
+
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _trayIcon.ToolTipText = tooltip;
+        });
+    }
+
     public void RecreateTrayIcon()
     {
         if (_disposed)

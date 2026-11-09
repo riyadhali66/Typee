@@ -14,6 +14,7 @@ using Typee.Core;
 using Typee.Core.Abstractions;
 using Typee.Core.Reliability;
 using Typee.Core.Typing;
+using Typee.Grammar;
 using Typee.Platform.Windows;
 using Typee.Platform.Windows.Keyboard;
 using Typee.Platform.Windows.SystemEvents;
@@ -30,6 +31,7 @@ public partial class App : Application
     private SuggestionOverlayService? _suggestionOverlay;
     private ServiceSupervisor? _hookSupervisor;
     private SystemEventMonitor? _systemEventMonitor;
+    private IGrammarChecker? _grammar;
     private static TrayIconHost? _trayForErrors;
     private static IDiagnosticsCollector? _diagnosticsForErrors;
 
@@ -80,6 +82,7 @@ public partial class App : Application
                     services.AddSingleton<IAppPaths>(paths);
                     services.AddSingleton(paths);
                     services.AddTypeeStorage();
+                    services.AddTypeeGrammar();
                     services.AddSingleton<KeyboardInterceptionState>();
                     services.AddSingleton<IRawKeyboardActivityClock, RawKeyboardActivityClock>();
                     services.AddSingleton<ISessionLockState, SessionLockState>();
@@ -155,6 +158,18 @@ public partial class App : Application
             _trayIconHost = _host.Services.GetRequiredService<TrayIconHost>();
             _trayForErrors = _trayIconHost;
 
+            _grammar = _host.Services.GetRequiredService<IGrammarChecker>();
+            _grammar.StatusChanged += OnGrammarStatusChanged;
+            try
+            {
+                await _grammar.StartAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Grammar subsystem failed to start — continuing with fallback");
+                _diagnosticsForErrors?.RecordError($"grammar-start:{ex.GetType().Name}");
+            }
+
             _systemEventMonitor = _host.Services.GetRequiredService<SystemEventMonitor>();
             _systemEventMonitor.SystemResumed += OnSystemResumed;
             _systemEventMonitor.TaskbarCreated += OnTaskbarCreated;
@@ -182,6 +197,13 @@ public partial class App : Application
         _systemEventMonitor = null;
         _hookSupervisor?.Dispose();
         _hookSupervisor = null;
+
+        if (_grammar is not null)
+        {
+            _grammar.StatusChanged -= OnGrammarStatusChanged;
+            // Host dispose tears down IGrammarChecker (IAsyncDisposable).
+            _grammar = null;
+        }
 
         _trayForErrors = null;
         _diagnosticsForErrors = null;
@@ -222,15 +244,39 @@ public partial class App : Application
             return;
         }
 
-        Dispatcher.BeginInvoke(() =>
+        Dispatcher.BeginInvoke(async () =>
         {
             try
             {
                 _host.Services.GetRequiredService<HotkeyCoordinator>().OnSystemResumed();
+                if (_grammar is not null)
+                {
+                    await _grammar.EnsureAliveAsync().ConfigureAwait(true);
+                }
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "Failed to handle system resume");
+            }
+        });
+    }
+
+    private void OnGrammarStatusChanged(object? sender, EventArgs e)
+    {
+        if (_grammar is null)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_grammar is { IsDisabled: true })
+            {
+                _trayForErrors?.ShowWarningBalloon(
+                    "Typee grammar disabled",
+                    "harper-ls restarted too many times. Using built-in fallback checker.");
+                _trayForErrors?.SetDegradedTooltip("Typee – grammar degraded");
+                _diagnosticsForErrors?.RecordError("grammar:disabled-restart-budget");
             }
         });
     }

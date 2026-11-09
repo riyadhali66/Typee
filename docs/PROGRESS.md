@@ -8,11 +8,11 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/5-sqlite-storage` |
-| Last completed | Phase 5 SQLite storage, phrases, privacy wipe |
-| Next task | Merge Phase 5 → main; then Phase 6 Harper → Checkpoint B path |
+| Current branch | `phase/6-harper-grammar` |
+| Last completed | Phase 6 Harper grammar (LSP + Job Object + fallback) |
+| Next task | Merge Phase 6 → main; then Phase 7 pipeline + LLM |
 | Half-done | None |
-| Uncommitted risks | None |
+| Uncommitted risks | `harper-ls.exe` is gitignored — CI/local must run `tools/fetch-harper.ps1` |
 | Updated | 2026-11-09 (Cursor) |
 
 ## Phase status
@@ -24,8 +24,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 2 — Keyboard hook + hotkeys | [x] merged; raw-input watchdog on main; soak [x] | d3251d8 |
 | 3 — Caret tracking + UIA text context | [x] merged; Checkpoint A partial | fabc808 / tag `checkpoint-a` |
 | 4 — Suggestion overlay | [x] merged to main | 1e6e4cc |
-| 5 — SQLite storage (all tables incl. 8E/8F) | [x] code done | (this branch) |
-| 6 — Harper grammar | [ ] | |
+| 5 — SQLite storage (all tables incl. 8E/8F) | [x] merged to main | 25b01d0 |
+| 6 — Harper grammar | [x] code done | (this branch) |
 | 7 — Pipeline + LLM + consent | [ ] | |
 | 8 — Text insertion + focus snapshot | [ ] | |
 | 8A — Typee button + Action Menu | [ ] | |
@@ -244,15 +244,24 @@ Tasks:
 - [!] Snippets / custom commands Settings UI deferred to Phase 8E (tables + repos ready)
 - [!] `tests/Typee.TestHost` still deferred
 
-## Phase 6 — Harper grammar — TODO
+## Phase 6 — Harper grammar — DONE
 
-- [ ] Read harper-ls docs; summarize findings before coding (stdio flag, plain-text languageId, config keys, diagnostics + code actions)
-- [ ] `tools/fetch-harper.ps1` full (download pinned win-x64 asset, checksum, copy binary + LICENSE)
-- [ ] HarperProcessSupervisor (hidden stdio child, Job Object, restart max 3/5 min → disable + tray notice)
-- [ ] HarperLspClient (StreamJsonRpc): initialize, didChangeConfiguration, one virtual doc, full-text didChange, await matching diagnostics (ignore stale), codeAction per diagnostic
-- [ ] LSP UTF-16 position ↔ string offset conversion (surrogates) + tests
-- [ ] GrammarService → GrammarIssue; nearest-before-caret priority; non-Latin skip; word-being-typed ignore; add-to-dictionary (SQLite + config resend); fallback mini-checker
-- [ ] Gate incl. kill harper-ls.exe → auto-restart
+Built: `docs/HARPER_NOTES.md` from official LS docs + README; `tools/fetch-harper.ps1` downloads pinned `harper-ls-x86_64-pc-windows-msvc.zip`, SHA256 (`tools/harper.sha256`), copies exe + LICENSE to `runtimes/harper/` + build output; `HarperProcessSupervisor` (`--stdio`, Job Object kill-on-close, restart max 3/5 min → disable + tray); `HarperLspClient` (StreamJsonRpc initialize/initialized, didChangeConfiguration, one `untitled:typee-buffer` plaintext doc, full didChange, await matching publishDiagnostics, codeAction); `LspPositionConverter` + tests (surrogates); `GrammarService : IGrammarChecker` → `GrammarIssue` (nearest-before-caret, non-Latin skip, ignore word being typed, dictionary → SQLite file + config resend); fallback mini-checker; DI + Diagnostics harper status; SystemResumed ensure-alive; THIRD_PARTY_NOTICES synced.
+
+### Decisions
+
+| Topic | Choice |
+|---|---|
+| languageId | `plaintext` (official table; also accepts `text`) |
+| User dictionary | SQLite → `%LOCALAPPDATA%\Typee\harper-user-dictionary.txt` via `userDictPath` (no inline word array in Harper config) |
+| disabledRules | Mapped to `harper-ls.linters.<Name>: false` |
+| Missing binary | Fallback checker; status shown in Diagnostics |
+
+### Phase 6 deferred / notes
+
+- [!] Live Notepad gate + kill-restart soak left for manual / Checkpoint B (unit + fallback covered)
+- [!] Grammar issues not yet surfaced in overlay (needs Phase 7 pipeline)
+- [!] `tests/Typee.TestHost` still deferred
 
 ## Phase 7 — Suggestion pipeline + LLM + consent — TODO
 

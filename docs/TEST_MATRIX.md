@@ -6,17 +6,17 @@ Legend: ✅ pass · ⚠️ partial / flaky · ❌ fail · — not tested · n/a 
 
 | App | Caret | Overlay | Context | Grammar | Completion | Insert | Lists | Command bar | Send-to-AI | Snippets | Voice |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Notepad | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Word | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Outlook | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Chrome (textarea) | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Edge | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Firefox | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| VS Code | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| WhatsApp desktop | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Telegram desktop | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Teams | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Slack | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Notepad | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Word | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Outlook | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Chrome (textarea) | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Edge | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Firefox | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| VS Code | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| WhatsApp desktop | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Telegram desktop | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Teams | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Slack | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | TestHost | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 
 ## Phase 4 manual checklist (overlay)
@@ -49,3 +49,17 @@ Status after Phase 4 code: matrix columns **Caret** / **Overlay** ready for Chec
 | Privacy Clear / Delete all | — manual |
 
 Logs must never contain phrase/dictionary/suggestion text (IDs and counts only).
+
+## Phase 6 automated coverage (grammar)
+
+| Area | Status |
+|---|---|
+| LSP UTF-16 position ↔ offset (incl. surrogates / CRLF) | ✅ unit |
+| Fallback mini-checker (repeated words, double spaces, capital after period) | ✅ unit |
+| Non-Latin paragraph skip + word-at-caret span | ✅ unit |
+| fetch-harper.ps1 SHA256 + LICENSE copy | ✅ script (local/CI) |
+| Notepad: "this is a  test test of the the app" → Harper fixes ~100 ms | — manual |
+| Kill harper-ls.exe → auto-restart (budget 3/5 min) | — manual |
+| Diagnostics shows harper status (no user text) | — manual |
+
+Grammar column in the matrix is ready for Checkpoint B manual fill once Phase 7 surfaces issues in the overlay.

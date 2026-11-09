@@ -18,7 +18,7 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Fetch Harper (stub in Phase 1)
+      - name: Fetch Harper
         shell: pwsh
         run: .\tools\fetch-harper.ps1
 
