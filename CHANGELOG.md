@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardening & Release Readiness spec (`docs/MASTER_PROMPT.md` §9): Credential Manager keys, Velopack installer plan, Arabic/a11y, test harness (deferred).
 - Agent handoff section in `docs/PROGRESS.md`.
 
+### Added
+- Phase 4: suggestion overlay (no-activate), Diagnostics window, EN/AR `.resx` scaffold.
+- Phase 5: SQLite `typee.db` migrations, phrase trie, Privacy wipe, caret method memory.
+- Phase 6: Harper LSP (`docs/HARPER_NOTES.md`, Job Object supervisor, fallback checker).
+- Phase 7: suggestion pipeline, OpenAI-compatible client, consent, Credential Manager keys, HTTPS + rate guard.
+- Phase 8: text insertion (SendInput UNICODE + clipboard restore), focus snapshot, pre-insert verify.
+- Checkpoint B manual script: `docs/CHECKPOINT_B.md`.
+
 ### Fixed
 - Phase 3 privacy: elevation unknown/missing PID, password property unknown/null, and mid-Invoke focus TOCTOU all fail closed via `TryGetSafeFocusedElement`.
 - Hook watchdog: Raw Input keyboard sink (`RIDEV_INPUTSINK`) timestamps only — replaces `GetLastInputInfo` mouse false positives.

@@ -8,11 +8,11 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/8-text-insertion` |
-| Last completed | Phase 8 text insertion + focus snapshot + clipboard restore |
-| Next task | Checkpoint B manual matrix (Notepad/Chrome/Word/VS Code insert); then Phase 8A |
+| Current branch | `main` (tag `checkpoint-b`) |
+| Last completed | Phases 4–8 merged; Checkpoint B docs + perf snapshot |
+| Next task | User runs `docs/CHECKPOINT_B.md`; then Phase 8A |
 | Half-done | None |
-| Uncommitted risks | `harper-ls.exe` is gitignored — CI/local must run `tools/fetch-harper.ps1` |
+| Uncommitted risks | `harper-ls.exe` gitignored — run `tools/fetch-harper.ps1`; live insert/grammar soak not verified |
 | Updated | 2026-11-09 (Cursor) |
 
 ## Phase status
@@ -27,7 +27,7 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 5 — SQLite storage (all tables incl. 8E/8F) | [x] merged to main | 25b01d0 |
 | 6 — Harper grammar | [x] merged to main | b0929fc |
 | 7 — Pipeline + LLM + consent | [x] merged to main | 3879fa5 / bd8bf98 |
-| 8 — Text insertion + focus snapshot | [x] code done | (this branch) |
+| 8 — Text insertion + focus snapshot | [x] merged; Checkpoint B pending manual | 6030444 / tag `checkpoint-b` |
 | 8A — Typee button + Action Menu | [ ] | |
 | 8B — Smart Lists | [ ] | |
 | 8C — Command Bar | [ ] | |
@@ -305,6 +305,36 @@ Built: `ITextInserter` / `IFocusSnapshotService` in Core; Platform `TextInserter
 - [x] Grammar fix: select span (UIA Select preferred, Shift+arrows fallback) → insert → restore caret
 - [x] Pre-insert verification (foreground + element + span text unchanged, else abort silently)
 - [x] IFocusSnapshotService (window/element/selection capture + restore); tests for pure parts
+
+## Checkpoint B — after Phase 8
+
+Manual script: [`docs/CHECKPOINT_B.md`](CHECKPOINT_B.md). Tag: `checkpoint-b`.
+
+### §9.5 performance budgets (agent snapshot 2026-11-09)
+
+| Metric | Budget | Measured | Notes |
+|---|---|---|---|
+| Idle CPU | < 1% | not verified — manual test needed | ~0.23 s CPU in first ~8 s idle; % not sampled |
+| RAM without Whisper | < 150 MB (incl. harper-ls) | **~43 MB** Typee alone | harper-ls **not attached** in this snapshot — combined RAM not verified |
+| Hook callback | < 1 ms p99 | not verified — manual test needed | DEBUG warning path exists; no p99 harness |
+| Overlay after pause (local) | < 50 ms | not verified — manual test needed | |
+| Harper result | < 150 ms / paragraph | not verified — manual test needed | |
+| Startup to tray | < 2 s | **~680 ms** | Release `Typee.exe` cold-ish start to process alive |
+
+Automated gate at Checkpoint B: **152** tests, 0 warnings / 0 errors (Release).
+
+### Known issues / not verified
+
+- Checkpoint A manual matrix deferred here — see `CHECKPOINT_B.md` §A
+- Live grammar overlay + Tab insert in Notepad/Word/Chrome — not verified
+- Live Ollama completion soak — not verified
+- CredMan Save/Clear/Test on a real profile — not verified
+- Kill harper-ls → auto-restart soak — not verified
+- Phrase `RecordAcceptAsync` not wired from Tab accept
+- Dummy suggestion has no insert plan
+- Clipboard 300 ms restore can overwrite a user Copy in that window
+- `tests/Typee.TestHost` still deferred
+- Compare links (gh unauthenticated): merge was direct to `main`
 
 ## Phase 8A — Typee button + Action Menu — TODO
 
