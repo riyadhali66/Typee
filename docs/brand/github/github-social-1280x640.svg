@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#F7F5FF"/>
+  <g transform="translate(153,190) scale(0.5078125)"><rect width="512" height="512" rx="112" fill="#7C3AED"/>
+  <path d="M215 138 L215 318 Q215 386 286 380" fill="none" stroke="#FFFFFF" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M166 208 L266 208" fill="none" stroke="#FFFFFF" stroke-width="46" stroke-linecap="round"/>
+  <rect x="339.0" y="122" width="30" height="272" rx="15.0" fill="#FDE68A"/></g>
+  <text x="469" y="332.0" font-family="Inter" font-weight="700" font-size="150" fill="#1E1B2E" letter-spacing="-3">Typee</text>
+  <text x="475" y="408.0" font-family="Inter" font-weight="500" font-size="44" fill="#5B4B8A">Type smarter, anywhere.</text>
+</svg>

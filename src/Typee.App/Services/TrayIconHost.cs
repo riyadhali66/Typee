@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 using Typee.App.Resources;
 using Typee.App.ViewModels;
 using Typee.App.Windows;
@@ -39,6 +40,8 @@ public sealed class TrayIconHost : IDisposable
     private readonly MenuItem _autoDummyItem;
     private SettingsWindow? _settingsWindow;
     private DiagnosticsWindow? _diagnosticsWindow;
+    private Icon? _currentTrayIcon;
+    private bool _forcePausedIcon;
     private bool _showKeyActivity;
     private bool _disposed;
 
@@ -128,12 +131,13 @@ public sealed class TrayIconHost : IDisposable
         menu.Items.Add(new Separator());
         menu.Items.Add(exitItem);
 
+        _currentTrayIcon = LoadTrayIconForCurrentState();
         _trayIcon = new TaskbarIcon
         {
             ToolTipText = DefaultTooltip,
             ContextMenu = menu,
             NoLeftClickDelay = true,
-            Icon = CreateTrayIcon()
+            Icon = _currentTrayIcon
         };
         _trayIcon.ForceCreate();
         _trayIcon.TrayMouseDoubleClick += (_, _) => ShowSettings();
@@ -141,6 +145,7 @@ public sealed class TrayIconHost : IDisposable
         _settingsStore.SettingsChanged += OnSettingsChanged;
         _typingActivity.TypingPaused += OnTypingPaused;
         _typingActivity.TypingResumed += OnTypingResumed;
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         _logger.LogInformation("Tray icon ready");
     }
 
@@ -167,7 +172,9 @@ public sealed class TrayIconHost : IDisposable
 
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
+            _forcePausedIcon = true;
             _trayIcon.ToolTipText = tooltip;
+            ApplyTrayIcon();
         });
     }
 
@@ -180,6 +187,7 @@ public sealed class TrayIconHost : IDisposable
 
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
+            ApplyTrayIcon();
             _trayIcon.ForceCreate();
             _logger.LogInformation("Tray icon recreated");
         });
@@ -245,7 +253,10 @@ public sealed class TrayIconHost : IDisposable
         _settingsStore.SettingsChanged -= OnSettingsChanged;
         _typingActivity.TypingPaused -= OnTypingPaused;
         _typingActivity.TypingResumed -= OnTypingResumed;
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
         _trayIcon.Dispose();
+        _currentTrayIcon?.Dispose();
+        _currentTrayIcon = null;
         _settingsWindow?.Close();
         _diagnosticsWindow?.Close();
     }
@@ -254,12 +265,28 @@ public sealed class TrayIconHost : IDisposable
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
+            if (settings.Suggestions.Enabled)
+            {
+                _forcePausedIcon = false;
+            }
+
             _pauseResumeItem.Header = settings.Suggestions.Enabled
                 ? Strings.Tray_PauseSuggestions
                 : Strings.Tray_EnableSuggestions;
             _autoDummyItem.IsChecked = settings.Suggestions.DebugDummyOnPause;
             _suggestionOverlay.AutoDummyOnPause = settings.Suggestions.DebugDummyOnPause;
+            ApplyTrayIcon();
         });
+    }
+
+    private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category is not (UserPreferenceCategory.General or UserPreferenceCategory.Color))
+        {
+            return;
+        }
+
+        Application.Current?.Dispatcher.BeginInvoke(ApplyTrayIcon);
     }
 
     private void OnShowCaretMarkerClicked(object sender, RoutedEventArgs e)
@@ -369,10 +396,52 @@ public sealed class TrayIconHost : IDisposable
         Application.Current.Shutdown();
     }
 
-    private static Icon CreateTrayIcon()
+    private void ApplyTrayIcon()
     {
-        var stream = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/tray.ico"))?.Stream
-            ?? throw new InvalidOperationException("Embedded tray.ico resource is missing.");
+        if (_disposed)
+        {
+            return;
+        }
+
+        var previous = _currentTrayIcon;
+        var next = LoadTrayIconForCurrentState();
+        _currentTrayIcon = next;
+        _trayIcon.Icon = next;
+        previous?.Dispose();
+    }
+
+    private Icon LoadTrayIconForCurrentState()
+    {
+        var paused = _forcePausedIcon || !_settingsStore.Current.Suggestions.Enabled;
+        var resource = paused
+            ? "Assets/typee-tray-paused.ico"
+            : SystemUsesLightTheme()
+                ? "Assets/typee-tray-black.ico"
+                : "Assets/typee-tray-white.ico";
+
+        var stream = Application.GetResourceStream(new Uri($"pack://application:,,,/{resource}"))?.Stream
+            ?? Application.GetResourceStream(new Uri("pack://application:,,,/Assets/tray.ico"))?.Stream
+            ?? throw new InvalidOperationException("Embedded tray icon resource is missing.");
+
         return new Icon(stream);
+    }
+
+    /// <summary>
+    /// Windows 10/11: 1 = light taskbar (use black glyph), 0 = dark taskbar (use white glyph).
+    /// Missing key → prefer white (Windows 11 dark default).
+    /// </summary>
+    private static bool SystemUsesLightTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            var value = key?.GetValue("SystemUsesLightTheme");
+            return value is int i && i == 1;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
