@@ -39,10 +39,10 @@ For a non-compatible API:
 ## Bumping the Harper version
 
 1. Edit `tools/harper.version` to the new release tag (e.g. `vX.Y.Z`)
-2. Update the expected SHA256 in `tools/fetch-harper.ps1` (or the checksum file it reads)
-3. Run `.\tools\fetch-harper.ps1` locally and confirm `harper-ls.exe` lands under `src/Typee.App/runtimes/harper/`
-4. Confirm CI still downloads and builds
-5. Note the bump in `THIRD_PARTY_NOTICES.md` / release notes
+2. Delete `tools/harper.sha256` (or update it) so the next fetch records/verifies the new zip hash
+3. Run `.\tools\fetch-harper.ps1` locally and confirm `harper-ls.exe` + `LICENSE` land under `src/Typee.App/runtimes/harper/`
+4. Commit the updated `harper.version` + `harper.sha256` (never commit the binary)
+5. Confirm CI still downloads and builds; note the bump in release notes
 
 ## Tests
 

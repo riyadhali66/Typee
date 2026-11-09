@@ -1,18 +1,20 @@
 # Third-party notices
 
-Typee includes or depends on the following open-source components. Licenses are summarized here; full license texts should be consulted at the upstream projects. Harper's Apache-2.0 LICENSE is copied next to `harper-ls.exe` at build time (Phase 6).
+Typee includes or depends on the following open-source components. Licenses are summarized here; full license texts should be consulted at the upstream projects. Harper's Apache-2.0 LICENSE is copied next to `harper-ls.exe` by `tools/fetch-harper.ps1` into `src/Typee.App/runtimes/harper/` (and build output).
 
 ## Harper (Automattic)
 
 - Project: https://github.com/Automattic/harper
 - License: Apache License 2.0
-- Use in Typee: offline grammar via the official `harper-ls` binary over LSP (Phase 6). Typee does not vendor Harper source.
+- Pin: see `tools/harper.version` / `tools/harper.sha256`
+- Use in Typee: offline grammar via the official `harper-ls` Windows x64 binary over LSP stdio (`--stdio`). Typee does not vendor Harper source.
+- Bundled artifacts (not committed): `harper-ls.exe` + `LICENSE` under `runtimes/harper/`
 
 ### Apache License 2.0 (Harper)
 
-```
-Copyright 2024 Automattic Inc.
+Upstream copyright notice (from Harper LICENSE appendix): Copyright 2024 Elijah Potter.
 
+```
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -26,7 +28,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-Full Apache-2.0 text: https://www.apache.org/licenses/LICENSE-2.0
+Full Apache-2.0 text is shipped beside `harper-ls.exe` and at https://www.apache.org/licenses/LICENSE-2.0
 
 ## Whisper.cpp / Whisper.net
 

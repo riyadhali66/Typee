@@ -6,5 +6,5 @@ namespace Typee.Grammar;
 /// </summary>
 public static class GrammarModuleMarker
 {
-    public const string PhaseStatus = "Deferred until Phase 6";
+    public const string PhaseStatus = "Phase 6 — Harper grammar";
 }
