@@ -6,8 +6,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
+using System.Windows.Controls;
 using Typee.App.Services;
 using Typee.Core.Abstractions;
+using Typee.Core.Llm;
 using Typee.Core.Models;
 using Typee.Core.Phrases;
 using Typee.Core.Settings;
@@ -28,6 +30,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     private readonly IPhraseService _phrases;
     private readonly IUserDictionaryRepository _dictionary;
     private readonly ITypeeDatabase _database;
+    private readonly IApiKeyStore _apiKeys;
+    private readonly ILlmClient _llm;
     private readonly ILogger _logger;
 
     private readonly Dictionary<string, (Func<string> Get, Action<string> Set)> _hotkeyEditors;
@@ -38,6 +42,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         IPhraseService phrases,
         IUserDictionaryRepository dictionary,
         ITypeeDatabase database,
+        IApiKeyStore apiKeys,
+        ILlmClient llm,
         ILogger logger)
     {
         _settingsStore = settingsStore;
@@ -45,6 +51,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _phrases = phrases;
         _dictionary = dictionary;
         _database = database;
+        _apiKeys = apiKeys;
+        _llm = llm;
         _logger = logger;
 
         _hotkeyEditors = new Dictionary<string, (Func<string>, Action<string>)>(StringComparer.Ordinal)
@@ -59,6 +67,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         };
 
         LoadFrom(settingsStore.Current);
+        RefreshApiKeyStatus();
         RefreshLoadNotices();
         _ = RefreshLearnedDataAsync();
     }
@@ -161,7 +170,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _storageSummary =
-        "settings.json / settings.backup.json (preferences only — API keys stay in environment variables); "
+        "settings.json / settings.backup.json (preferences only — API keys in Windows Credential Manager or env vars, never in JSON/DB/logs); "
         + "typee.db (phrases, dictionary, completion cache, snippets, custom commands, recent instructions, "
         + "action profile memory, endpoint acknowledgments, caret method memory — process names only); "
         + "logs\\ (counts and errors, never typed text); models\\ (downloaded speech models); crash.marker while running.";
@@ -201,6 +210,18 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private double _llmTemperature = 0.3;
+
+    [ObservableProperty]
+    private int _llmMaxRequestsPerMinute = 20;
+
+    [ObservableProperty]
+    private string _llmDailyRequestCapText = string.Empty;
+
+    [ObservableProperty]
+    private string _apiKeyStatusText = "Stored key: (not set)";
+
+    [ObservableProperty]
+    private bool _llmConsentAccepted;
 
     // --- Status / capture ---
 
@@ -255,6 +276,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         try
         {
+            if (!LlmEndpointPolicy.TryValidateBaseUrl(LlmBaseUrl, out var urlError))
+            {
+                StatusMessage = urlError ?? "Invalid LLM base URL";
+                return;
+            }
+
             // Clone the store's current settings so sections without UI (button,
             // smartLists, promptAssist, snippets) survive a save from this window.
             var settings = _settingsStore.Current;
@@ -267,6 +294,82 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             StatusMessage = "Save failed — see logs";
             _logger.LogError(ex, "Failed to save settings from UI");
+        }
+    }
+
+    [RelayCommand]
+    private void SaveApiKey(PasswordBox? box)
+    {
+        try
+        {
+            var key = box?.Password?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                StatusMessage = "Enter an API key to save";
+                return;
+            }
+
+            _apiKeys.Save(IApiKeyStore.DefaultProfile, key);
+            if (box is not null)
+            {
+                box.Password = string.Empty;
+            }
+
+            RefreshApiKeyStatus();
+            StatusMessage = "API key saved to Credential Manager";
+            _logger.LogInformation("API key saved via settings UI");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Failed to save API key";
+            _logger.LogError(ex, "Failed to save API key");
+        }
+    }
+
+    [RelayCommand]
+    private void ClearApiKey()
+    {
+        try
+        {
+            _apiKeys.Clear(IApiKeyStore.DefaultProfile);
+            RefreshApiKeyStatus();
+            StatusMessage = "API key cleared";
+            _logger.LogInformation("API key cleared via settings UI");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Failed to clear API key";
+            _logger.LogError(ex, "Failed to clear API key");
+        }
+    }
+
+    [RelayCommand]
+    private async Task TestLlmAsync()
+    {
+        try
+        {
+            if (!LlmEndpointPolicy.TryValidateBaseUrl(LlmBaseUrl, out var urlError))
+            {
+                StatusMessage = urlError ?? "Invalid LLM base URL";
+                return;
+            }
+
+            // Persist URL/model before testing so the client reads current values.
+            var settings = _settingsStore.Current;
+            ApplyTo(settings);
+            await _settingsStore.SaveAsync(settings).ConfigureAwait(true);
+
+            StatusMessage = "Testing LLM connection…";
+            var result = await _llm.TestConnectionAsync().ConfigureAwait(true);
+            StatusMessage = result.Success
+                ? $"Test OK ({result.Latency.TotalMilliseconds:0} ms)"
+                : $"Test failed: {result.Message}";
+            _logger.LogInformation("LLM connection test success={Success}", result.Success);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = "Test failed — see logs";
+            _logger.LogError(ex, "LLM connection test threw");
         }
     }
 
@@ -666,6 +769,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         LlmTimeoutMs = settings.Llm.TimeoutMs;
         LlmMaxTokens = settings.Llm.MaxTokens;
         LlmTemperature = settings.Llm.Temperature;
+        LlmMaxRequestsPerMinute = settings.Llm.MaxRequestsPerMinute;
+        LlmDailyRequestCapText = settings.Llm.DailyRequestCap is > 0
+            ? settings.Llm.DailyRequestCap.Value.ToString()
+            : string.Empty;
+        LlmConsentAccepted = settings.Privacy.LlmConsentAccepted;
+        RefreshApiKeyStatus();
 
         SpeechModel = settings.Speech.Model;
         SpeechLanguage = settings.Speech.Language;
@@ -707,6 +816,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         settings.Llm.TimeoutMs = LlmTimeoutMs;
         settings.Llm.MaxTokens = LlmMaxTokens;
         settings.Llm.Temperature = LlmTemperature;
+        settings.Llm.MaxRequestsPerMinute = LlmMaxRequestsPerMinute;
+        settings.Llm.DailyRequestCap = int.TryParse(LlmDailyRequestCapText.Trim(), out var cap) && cap > 0
+            ? cap
+            : null;
+        settings.Privacy.LlmConsentAccepted = LlmConsentAccepted;
 
         settings.Speech.Model = SpeechModel.Trim();
         settings.Speech.Language = SpeechLanguage.Trim();
@@ -726,6 +840,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         LoadNoticesText = notices.Count == 0
             ? string.Empty
             : string.Join(Environment.NewLine, notices);
+    }
+
+    private void RefreshApiKeyStatus()
+    {
+        var last4 = _apiKeys.GetMaskedLast4(IApiKeyStore.DefaultProfile);
+        ApiKeyStatusText = last4 is null
+            ? "Stored key: (not set)"
+            : $"Stored key: {ApiKeyMask.FormatMasked(last4)}";
     }
 
     private async Task ClearLocalUserDataAsync(bool includeSettings)

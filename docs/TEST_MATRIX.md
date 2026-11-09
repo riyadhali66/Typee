@@ -6,7 +6,7 @@ Legend: ✅ pass · ⚠️ partial / flaky · ❌ fail · — not tested · n/a 
 
 | App | Caret | Overlay | Context | Grammar | Completion | Insert | Lists | Command bar | Send-to-AI | Snippets | Voice |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Notepad | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Notepad | — | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a |
 | Word | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | Outlook | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 | Chrome (textarea) | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
@@ -63,3 +63,20 @@ Logs must never contain phrase/dictionary/suggestion text (IDs and counts only).
 | Diagnostics shows harper status (no user text) | — manual |
 
 Grammar column in the matrix is ready for Checkpoint B manual fill once Phase 7 surfaces issues in the overlay.
+
+## Phase 7 automated coverage (pipeline + LLM)
+
+| Area | Status |
+|---|---|
+| Suggestion router priority + cancellation + provider failure skip | ✅ unit |
+| Typing debounce (pause gate) | ✅ unit |
+| Style-check JSON (strict / fenced / malformed) | ✅ unit |
+| HTTPS policy (localhost HTTP OK; remote HTTP refused) | ✅ unit |
+| Rate guard (per-minute + daily) | ✅ unit |
+| API key resolve CredMan → env → none + last-4 mask | ✅ unit |
+| OpenAI-compatible SSE parse + one retry + embedded prompts | ✅ unit |
+| First-run consent UI | — manual |
+| CredMan Save/Clear/Test in Settings | — manual |
+| Ollama on → completion ~1–2 s; typing cancels; Ollama off → grammar/phrases work | — manual |
+
+Completion column is ready for Checkpoint B manual fill (pipeline wired; insert still Phase 8).

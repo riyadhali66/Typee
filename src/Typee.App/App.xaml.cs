@@ -14,7 +14,10 @@ using Typee.Core;
 using Typee.Core.Abstractions;
 using Typee.Core.Reliability;
 using Typee.Core.Typing;
+using Typee.App.Windows;
+using Typee.Core.Llm;
 using Typee.Grammar;
+using Typee.Llm;
 using Typee.Platform.Windows;
 using Typee.Platform.Windows.Keyboard;
 using Typee.Platform.Windows.SystemEvents;
@@ -32,6 +35,8 @@ public partial class App : Application
     private ServiceSupervisor? _hookSupervisor;
     private SystemEventMonitor? _systemEventMonitor;
     private IGrammarChecker? _grammar;
+    private ILlmClient? _llm;
+    private ILlmRateGuard? _rateGuard;
     private static TrayIconHost? _trayForErrors;
     private static IDiagnosticsCollector? _diagnosticsForErrors;
 
@@ -83,6 +88,8 @@ public partial class App : Application
                     services.AddSingleton(paths);
                     services.AddTypeeStorage();
                     services.AddTypeeGrammar();
+                    services.AddTypeePlatformWindows();
+                    services.AddTypeeLlm();
                     services.AddSingleton<KeyboardInterceptionState>();
                     services.AddSingleton<IRawKeyboardActivityClock, RawKeyboardActivityClock>();
                     services.AddSingleton<ISessionLockState, SessionLockState>();
@@ -94,7 +101,6 @@ public partial class App : Application
                         TimeProvider.System,
                         sp.GetRequiredService<ISettingsStore>().Current.Suggestions.DebounceMs));
                     services.AddSingleton<HotkeyCoordinator>();
-                    services.AddTypeePlatformWindows();
                     services.AddSingleton<CaretMarkerService>();
                     services.AddSingleton<UiLanguageService>();
                     services.AddSingleton<IDiagnosticsCollector, DiagnosticsCollector>();
@@ -108,6 +114,7 @@ public partial class App : Application
 
             var settingsStore = _host.Services.GetRequiredService<ISettingsStore>();
             await settingsStore.LoadAsync().ConfigureAwait(true);
+            await OfferConsentIfNeededAsync(settingsStore).ConfigureAwait(true);
 
             _diagnosticsForErrors = _host.Services.GetRequiredService<IDiagnosticsCollector>();
 
@@ -170,6 +177,11 @@ public partial class App : Application
                 _diagnosticsForErrors?.RecordError($"grammar-start:{ex.GetType().Name}");
             }
 
+            _llm = _host.Services.GetRequiredService<ILlmClient>();
+            _llm.StatusChanged += OnLlmStatusChanged;
+            _rateGuard = _host.Services.GetRequiredService<ILlmRateGuard>();
+            _rateGuard.Paused += OnLlmRateGuardPaused;
+
             _systemEventMonitor = _host.Services.GetRequiredService<SystemEventMonitor>();
             _systemEventMonitor.SystemResumed += OnSystemResumed;
             _systemEventMonitor.TaskbarCreated += OnTaskbarCreated;
@@ -203,6 +215,18 @@ public partial class App : Application
             _grammar.StatusChanged -= OnGrammarStatusChanged;
             // Host dispose tears down IGrammarChecker (IAsyncDisposable).
             _grammar = null;
+        }
+
+        if (_llm is not null)
+        {
+            _llm.StatusChanged -= OnLlmStatusChanged;
+            _llm = null;
+        }
+
+        if (_rateGuard is not null)
+        {
+            _rateGuard.Paused -= OnLlmRateGuardPaused;
+            _rateGuard = null;
         }
 
         _trayForErrors = null;
@@ -279,6 +303,60 @@ public partial class App : Application
                 _diagnosticsForErrors?.RecordError("grammar:disabled-restart-budget");
             }
         });
+    }
+
+    private void OnLlmStatusChanged(object? sender, EventArgs e)
+    {
+        if (_llm is null)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_llm is { IsOnline: false })
+            {
+                _trayForErrors?.ShowWarningBalloon(
+                    "Typee LLM offline",
+                    "Remote completions paused. Local grammar and phrases still work.");
+                _trayForErrors?.SetDegradedTooltip("Typee – LLM offline");
+                _diagnosticsForErrors?.RecordError($"llm:offline:{_llm.Status}");
+            }
+        });
+    }
+
+    private void OnLlmRateGuardPaused(object? sender, LlmRateGuardPausedEventArgs e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            _trayForErrors?.ShowWarningBalloon(
+                "Typee LLM paused",
+                $"Request limit reached ({e.Reason}). Local features still work.");
+            _trayForErrors?.SetDegradedTooltip("Typee – LLM rate limited");
+            _diagnosticsForErrors?.RecordError($"llm:rate-guard:{e.Reason}");
+        });
+    }
+
+    private static async Task OfferConsentIfNeededAsync(ISettingsStore settingsStore)
+    {
+        var settings = settingsStore.Current;
+        if (settings.Privacy.LlmConsentAccepted)
+        {
+            return;
+        }
+
+        var dialog = new ConsentWindow();
+        var result = dialog.ShowDialog();
+        if (result == true && dialog.Accepted)
+        {
+            settings.Privacy.LlmConsentAccepted = true;
+            await settingsStore.SaveAsync(settings).ConfigureAwait(true);
+            Log.Information("LLM privacy consent accepted");
+        }
+        else
+        {
+            Log.Information("LLM privacy consent deferred — local features only");
+        }
     }
 
     private void OnTaskbarCreated(object? sender, EventArgs e)

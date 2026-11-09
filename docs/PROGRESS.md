@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/6-harper-grammar` |
-| Last completed | Phase 6 Harper grammar (LSP + Job Object + fallback) |
-| Next task | Merge Phase 6 → main; then Phase 7 pipeline + LLM |
+| Current branch | `phase/7-suggestion-pipeline` |
+| Last completed | Phase 7 suggestion pipeline + LLM + consent + CredMan |
+| Next task | Merge Phase 7 → main; then Phase 8 text insertion |
 | Half-done | None |
 | Uncommitted risks | `harper-ls.exe` is gitignored — CI/local must run `tools/fetch-harper.ps1` |
 | Updated | 2026-11-09 (Cursor) |
@@ -25,8 +25,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 3 — Caret tracking + UIA text context | [x] merged; Checkpoint A partial | fabc808 / tag `checkpoint-a` |
 | 4 — Suggestion overlay | [x] merged to main | 1e6e4cc |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [x] merged to main | 25b01d0 |
-| 6 — Harper grammar | [x] code done | (this branch) |
-| 7 — Pipeline + LLM + consent | [ ] | |
+| 6 — Harper grammar | [x] merged to main | b0929fc |
+| 7 — Pipeline + LLM + consent | [x] code done | (this branch) |
 | 8 — Text insertion + focus snapshot | [ ] | |
 | 8A — Typee button + Action Menu | [ ] | |
 | 8B — Smart Lists | [ ] | |
@@ -263,12 +263,30 @@ Built: `docs/HARPER_NOTES.md` from official LS docs + README; `tools/fetch-harpe
 - [!] Grammar issues not yet surfaced in overlay (needs Phase 7 pipeline)
 - [!] `tests/Typee.TestHost` still deferred
 
-## Phase 7 — Suggestion pipeline + LLM + consent — TODO
+## Phase 7 — Suggestion pipeline + LLM + consent — DONE
 
-- [ ] Pipeline on TypingPaused: context read → bail rules → local (trie, cache) → L1 grammar → (optional LLM deep check) → L2 completion; L1 > L2
-- [ ] Cancellation (TypingResumed/focus/newer request); only latest updates UI
-- [ ] OpenAiCompatibleClient (SSE streaming, timeout, 1 retry, offline → tray tooltip); prompt templates in `Typee.Llm/Prompts/*.txt`; ISuggestionProvider
-- [ ] First-run consent screen; router/debouncer/cancel/JSON-parse tests (incl. malformed)
+Built: `SuggestionPipelineService` + `SuggestionRouter` + `ISuggestionProvider` plugins (local phrase → completion cache → Harper grammar → optional LLM style JSON → LLM completion). `SuggestionRequestCoordinator` cancels on TypingResumed / focus / newer request; overlay only applies the latest generation. `OpenAiCompatibleClient` (SSE `/v1/chat/completions`, timeout, one retry, offline → tray tooltip; local features keep working). Prompt templates embedded from `src/Typee.Llm/Prompts/*.txt`. First-run `ConsentWindow` (local vs LLM). Credential Manager API keys (Save/Clear/Test; last 4 only; CredMan → env → none). HTTPS required for non-localhost `baseUrl`. Rate/cost guard (`maxRequestsPerMinute` default 20, optional daily cap) with tray pause notice.
+
+### Automated coverage
+
+| Area | Status |
+|---|---|
+| Router priority (L1 > L2) + failing provider skip | ✅ unit |
+| Request coordinator cancellation / generation | ✅ unit |
+| Typing debounce gate (pause/resume) | ✅ unit |
+| Style-check JSON parse incl. malformed / fenced | ✅ unit |
+| HTTPS endpoint policy | ✅ unit |
+| Rate guard per-minute + daily cap | ✅ unit |
+| API key resolve order + mask | ✅ unit |
+| SSE client parse + one retry + embedded prompts | ✅ unit |
+| Ollama live completion ~1–2 s | — manual |
+| CredMan Save/Clear round-trip on a real Windows profile | — manual |
+
+### Phase 7 deferred / notes
+
+- [!] Live Ollama / remote HTTPS soak left for manual Checkpoint B
+- [!] CredMan interop compiled + unit-covered via `MemoryApiKeyStore` + resolver; interactive Save/Clear/Test on a developer machine still recommended
+- [!] Text insert on Tab still Phase 8 (accept currently dismisses only)
 
 ## Phase 8 — Text insertion + focus snapshot — TODO
 

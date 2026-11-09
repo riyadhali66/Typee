@@ -24,6 +24,8 @@ public sealed class TrayIconHost : IDisposable
     private readonly IPhraseService _phrases;
     private readonly IUserDictionaryRepository _dictionary;
     private readonly ITypeeDatabase _database;
+    private readonly IApiKeyStore _apiKeys;
+    private readonly ILlmClient _llm;
     private readonly TypingActivityService _typingActivity;
     private readonly CaretMarkerService _caretMarker;
     private readonly SuggestionOverlayService _suggestionOverlay;
@@ -46,6 +48,8 @@ public sealed class TrayIconHost : IDisposable
         IPhraseService phrases,
         IUserDictionaryRepository dictionary,
         ITypeeDatabase database,
+        IApiKeyStore apiKeys,
+        ILlmClient llm,
         TypingActivityService typingActivity,
         CaretMarkerService caretMarker,
         SuggestionOverlayService suggestionOverlay,
@@ -58,6 +62,8 @@ public sealed class TrayIconHost : IDisposable
         _phrases = phrases;
         _dictionary = dictionary;
         _database = database;
+        _apiKeys = apiKeys;
+        _llm = llm;
         _typingActivity = typingActivity;
         _caretMarker = caretMarker;
         _suggestionOverlay = suggestionOverlay;
@@ -201,6 +207,8 @@ public sealed class TrayIconHost : IDisposable
             _phrases,
             _dictionary,
             _database,
+            _apiKeys,
+            _llm,
             _logger);
         _settingsWindow = new SettingsWindow(viewModel);
         _settingsWindow.FlowDirection = _uiLanguage.CurrentFlowDirection;

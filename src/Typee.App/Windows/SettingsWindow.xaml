@@ -228,12 +228,20 @@
         <ScrollViewer Style="{StaticResource TabScroll}">
           <StackPanel>
             <TextBlock Text="LLM (OpenAI-compatible /v1/chat/completions)" Style="{StaticResource SectionHeader}"/>
-            <TextBlock Text="Any OpenAI-compatible endpoint works: Ollama, vLLM, DeepSeek, OpenAI, Z.ai GLM (used from Phase 7)." Foreground="#FF666666" Margin="0,0,0,8"/>
+            <TextBlock Text="Any OpenAI-compatible endpoint works: Ollama, vLLM, DeepSeek, OpenAI, Z.ai GLM. Remote hosts require HTTPS." Foreground="#FF666666" Margin="0,0,0,8"/>
             <TextBlock Text="Base URL" Style="{StaticResource FieldLabel}"/>
             <TextBox Text="{Binding LlmBaseUrl, UpdateSourceTrigger=PropertyChanged}"/>
             <TextBlock Text="Model" Style="{StaticResource FieldLabel}"/>
             <TextBox Text="{Binding LlmModel, UpdateSourceTrigger=PropertyChanged}"/>
-            <TextBlock Text="API key environment variable (never stored in settings.json)" Style="{StaticResource FieldLabel}"/>
+            <TextBlock Text="API key (Windows Credential Manager — never in settings.json)" Style="{StaticResource FieldLabel}"/>
+            <TextBlock Text="{Binding ApiKeyStatusText}" Foreground="#FF555555" Margin="0,0,0,4"/>
+            <PasswordBox x:Name="ApiKeyBox" Margin="0,0,0,8" Padding="6,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+              <Button Content="Save key" Width="90" Margin="0,0,8,0" Command="{Binding SaveApiKeyCommand}" CommandParameter="{Binding ElementName=ApiKeyBox}"/>
+              <Button Content="Clear key" Width="90" Margin="0,0,8,0" Command="{Binding ClearApiKeyCommand}"/>
+              <Button Content="Test" Width="90" Command="{Binding TestLlmCommand}"/>
+            </StackPanel>
+            <TextBlock Text="Fallback API key environment variable" Style="{StaticResource FieldLabel}"/>
             <TextBox Text="{Binding ApiKeyEnvVar, UpdateSourceTrigger=PropertyChanged}"/>
             <TextBlock Text="Timeout (ms)" Style="{StaticResource FieldLabel}"/>
             <TextBox Text="{Binding LlmTimeoutMs, UpdateSourceTrigger=PropertyChanged}"/>
@@ -241,6 +249,11 @@
             <TextBox Text="{Binding LlmMaxTokens, UpdateSourceTrigger=PropertyChanged}"/>
             <TextBlock Text="Temperature" Style="{StaticResource FieldLabel}"/>
             <TextBox Text="{Binding LlmTemperature, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="Max requests / minute" Style="{StaticResource FieldLabel}"/>
+            <TextBox Text="{Binding LlmMaxRequestsPerMinute, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBlock Text="Daily request cap (blank = unlimited)" Style="{StaticResource FieldLabel}"/>
+            <TextBox Text="{Binding LlmDailyRequestCapText, UpdateSourceTrigger=PropertyChanged}"/>
+            <CheckBox Content="LLM privacy consent accepted" IsChecked="{Binding LlmConsentAccepted}" Margin="0,8,0,0"/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

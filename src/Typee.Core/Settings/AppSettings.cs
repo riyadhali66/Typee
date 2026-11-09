@@ -15,6 +15,7 @@ public sealed class AppSettings
     public PromptAssistSettings PromptAssist { get; set; } = new();
     public SnippetsSettings Snippets { get; set; } = new();
     public SpeechSettings Speech { get; set; } = new();
+    public PrivacySettings Privacy { get; set; } = new();
     public List<string> TranslateTargets { get; set; } = ["English", "Arabic"];
     public List<string> BlockedProcesses { get; set; } = DefaultBlockedProcesses();
     public bool StartWithWindows { get; set; }
@@ -119,6 +120,18 @@ public sealed class LlmSettings
     public int TimeoutMs { get; set; } = 8000;
     public int MaxTokens { get; set; } = 60;
     public double Temperature { get; set; } = 0.3;
+
+    /// <summary>Max LLM requests per minute per profile (default 20).</summary>
+    public int MaxRequestsPerMinute { get; set; } = 20;
+
+    /// <summary>Optional daily request cap; null or ≤0 means unlimited.</summary>
+    public int? DailyRequestCap { get; set; }
+}
+
+public sealed class PrivacySettings
+{
+    /// <summary>First-run consent: local vs LLM data handling acknowledged.</summary>
+    public bool LlmConsentAccepted { get; set; }
 }
 
 public sealed class ButtonSettings

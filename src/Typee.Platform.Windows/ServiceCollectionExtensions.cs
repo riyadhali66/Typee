@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Typee.Core.Abstractions;
 using Typee.Platform.Windows.Caret;
 using Typee.Platform.Windows.Process;
+using Typee.Platform.Windows.Security;
 using Typee.Platform.Windows.Uia;
 
 namespace Typee.Platform.Windows;
@@ -17,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITargetContextGuard>(sp => sp.GetRequiredService<ProcessInfoService>());
         services.AddSingleton<ICaretLocator, CaretLocator>();
         services.AddSingleton<ITextContextReader, UiaTextContextReader>();
+        services.AddSingleton<IApiKeyStore, WindowsCredentialApiKeyStore>();
         return services;
     }
 }

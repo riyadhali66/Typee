@@ -389,4 +389,41 @@ internal static partial class NativeMethods
         public nuint LpszClassName;
         public nint HIconSm;
     }
+
+    // --- Windows Credential Manager (advapi32) — API keys only, never logged ---
+    public const uint CredTypeGeneric = 1;
+    public const uint CredPersistLocalMachine = 2;
+    public const int ErrorNotFound = 1168;
+
+    [LibraryImport("advapi32.dll", EntryPoint = "CredWriteW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CredWriteW(ref Credential credential, uint flags);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "CredReadW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CredReadW(string targetName, uint type, uint flags, out nint credential);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "CredDeleteW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CredDeleteW(string targetName, uint type, uint flags);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "CredFree", SetLastError = false)]
+    internal static partial void CredFree(nint buffer);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Credential
+    {
+        public uint Flags;
+        public uint Type;
+        public nint TargetName;
+        public nint Comment;
+        public long LastWritten;
+        public uint CredentialBlobSize;
+        public nint CredentialBlob;
+        public uint Persist;
+        public uint AttributeCount;
+        public nint Attributes;
+        public nint TargetAlias;
+        public nint UserName;
+    }
 }

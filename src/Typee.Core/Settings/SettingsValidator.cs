@@ -19,10 +19,23 @@ public static class SettingsValidator
         RepairHotkey(settings.Hotkeys.AcceptSuggestion, defaults.Hotkeys.AcceptSuggestion, v => settings.Hotkeys.AcceptSuggestion = v, "hotkeys.acceptSuggestion", reset);
         RepairHotkey(settings.Hotkeys.Dismiss, defaults.Hotkeys.Dismiss, v => settings.Hotkeys.Dismiss = v, "hotkeys.dismiss", reset);
 
-        if (!Uri.TryCreate(settings.Llm.BaseUrl, UriKind.Absolute, out _))
+        if (!Uri.TryCreate(settings.Llm.BaseUrl, UriKind.Absolute, out _)
+            || !Llm.LlmEndpointPolicy.IsAllowed(settings.Llm.BaseUrl))
         {
             settings.Llm.BaseUrl = defaults.Llm.BaseUrl;
             reset.Add("llm.baseUrl");
+        }
+
+        if (settings.Llm.MaxRequestsPerMinute is < 1 or > 1000)
+        {
+            settings.Llm.MaxRequestsPerMinute = defaults.Llm.MaxRequestsPerMinute;
+            reset.Add("llm.maxRequestsPerMinute");
+        }
+
+        if (settings.Llm.DailyRequestCap is < 0)
+        {
+            settings.Llm.DailyRequestCap = defaults.Llm.DailyRequestCap;
+            reset.Add("llm.dailyRequestCap");
         }
 
         if (string.IsNullOrWhiteSpace(settings.Llm.Model))
