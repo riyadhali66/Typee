@@ -79,7 +79,8 @@ public static class SettingsValidator
             reset.Add("promptAssist.detectionThreshold");
         }
 
-        if (string.IsNullOrWhiteSpace(settings.UiLanguage))
+        if (string.IsNullOrWhiteSpace(settings.UiLanguage)
+            || settings.UiLanguage is not ("auto" or "en" or "ar"))
         {
             settings.UiLanguage = defaults.UiLanguage;
             reset.Add("uiLanguage");

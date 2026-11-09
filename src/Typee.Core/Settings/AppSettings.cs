@@ -94,6 +94,9 @@ public sealed class SuggestionSettings
     public int MaxContextChars { get; set; } = 1500;
     public bool Level1GrammarEnabled { get; set; } = true;
     public bool Level2CompletionEnabled { get; set; } = true;
+
+    /// <summary>Debug: show a dummy suggestion on each typing pause (Phase 4 manual testing).</summary>
+    public bool DebugDummyOnPause { get; set; }
 }
 
 public sealed class GrammarSettings

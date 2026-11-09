@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AppName" xml:space="preserve"><value>Typee</value></data>
+  <data name="Suggestion_GrammarFix" xml:space="preserve"><value>تصحيح النحو</value></data>
+  <data name="Suggestion_Completion" xml:space="preserve"><value>هل تقصد هذا؟</value></data>
+  <data name="Suggestion_List" xml:space="preserve"><value>قائمة</value></data>
+  <data name="Suggestion_PromptAssist" xml:space="preserve"><value>يبدو كأمر للذكاء الاصطناعي</value></data>
+  <data name="Suggestion_Hint" xml:space="preserve"><value>Tab قبول · Esc إلغاء</value></data>
+  <data name="Suggestion_Wordmark" xml:space="preserve"><value>Typee</value></data>
+  <data name="Suggestion_OptionAutomationFormat" xml:space="preserve"><value>خيار الاقتراح {0}</value></data>
+  <data name="Tray_PauseSuggestions" xml:space="preserve"><value>إيقاف الاقتراحات</value></data>
+  <data name="Tray_EnableSuggestions" xml:space="preserve"><value>تفعيل الاقتراحات</value></data>
+  <data name="Tray_Settings" xml:space="preserve"><value>الإعدادات…</value></data>
+  <data name="Tray_OpenLogs" xml:space="preserve"><value>فتح مجلد السجلات</value></data>
+  <data name="Tray_Diagnostics" xml:space="preserve"><value>التشخيص…</value></data>
+  <data name="Tray_ShowDummySuggestion" xml:space="preserve"><value>إظهار اقتراح تجريبي</value></data>
+  <data name="Tray_AutoDummyOnPause" xml:space="preserve"><value>اقتراح تجريبي عند التوقف</value></data>
+  <data name="Tray_ShowKeyActivity" xml:space="preserve"><value>إظهار نشاط الكتابة</value></data>
+  <data name="Tray_ShowCaretMarker" xml:space="preserve"><value>إظهار مؤشر المؤشر</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>خروج</value></data>
+  <data name="Diagnostics_Title" xml:space="preserve"><value>تشخيص Typee</value></data>
+  <data name="Diagnostics_Cpu" xml:space="preserve"><value>المعالج</value></data>
+  <data name="Diagnostics_Ram" xml:space="preserve"><value>الذاكرة</value></data>
+  <data name="Diagnostics_Hook" xml:space="preserve"><value>خطاف لوحة المفاتيح</value></data>
+  <data name="Diagnostics_LastReinstall" xml:space="preserve"><value>آخر إعادة تثبيت</value></data>
+  <data name="Diagnostics_CaretMethod" xml:space="preserve"><value>طريقة المؤشر</value></data>
+  <data name="Diagnostics_Harper" xml:space="preserve"><value>Harper</value></data>
+  <data name="Diagnostics_Llm" xml:space="preserve"><value>نموذج اللغة</value></data>
+  <data name="Diagnostics_RecentErrors" xml:space="preserve"><value>أخطاء حديثة</value></data>
+  <data name="Diagnostics_Never" xml:space="preserve"><value>أبداً</value></data>
+  <data name="Diagnostics_Installed" xml:space="preserve"><value>مثبت</value></data>
+  <data name="Diagnostics_NotInstalled" xml:space="preserve"><value>غير مثبت</value></data>
+  <data name="Overlay_AutomationName" xml:space="preserve"><value>اقتراح Typee</value></data>
+</root>

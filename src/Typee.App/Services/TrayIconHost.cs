@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using H.NotifyIcon;
 using H.NotifyIcon.Core;
 using Microsoft.Extensions.Logging;
+using Typee.App.Resources;
 using Typee.App.ViewModels;
 using Typee.App.Windows;
 using Typee.Core.Abstractions;
@@ -22,12 +23,17 @@ public sealed class TrayIconHost : IDisposable
     private readonly IAppPaths _paths;
     private readonly TypingActivityService _typingActivity;
     private readonly CaretMarkerService _caretMarker;
+    private readonly SuggestionOverlayService _suggestionOverlay;
+    private readonly IDiagnosticsCollector _diagnostics;
+    private readonly UiLanguageService _uiLanguage;
     private readonly ILogger<TrayIconHost> _logger;
     private readonly TaskbarIcon _trayIcon;
     private readonly MenuItem _pauseResumeItem;
     private readonly MenuItem _showKeyActivityItem;
     private readonly MenuItem _showCaretMarkerItem;
+    private readonly MenuItem _autoDummyItem;
     private SettingsWindow? _settingsWindow;
+    private DiagnosticsWindow? _diagnosticsWindow;
     private bool _showKeyActivity;
     private bool _disposed;
 
@@ -36,39 +42,72 @@ public sealed class TrayIconHost : IDisposable
         IAppPaths paths,
         TypingActivityService typingActivity,
         CaretMarkerService caretMarker,
+        SuggestionOverlayService suggestionOverlay,
+        IDiagnosticsCollector diagnostics,
+        UiLanguageService uiLanguage,
         ILogger<TrayIconHost> logger)
     {
         _settingsStore = settingsStore;
         _paths = paths;
         _typingActivity = typingActivity;
         _caretMarker = caretMarker;
+        _suggestionOverlay = suggestionOverlay;
+        _diagnostics = diagnostics;
+        _uiLanguage = uiLanguage;
         _logger = logger;
 
         _pauseResumeItem = new MenuItem
         {
-            Header = settingsStore.Current.Suggestions.Enabled ? "Pause suggestions" : "Enable suggestions"
+            Header = settingsStore.Current.Suggestions.Enabled
+                ? Strings.Tray_PauseSuggestions
+                : Strings.Tray_EnableSuggestions
         };
         _pauseResumeItem.Click += OnPauseResumeClicked;
 
-        var settingsItem = new MenuItem { Header = "Settings…" };
+        var settingsItem = new MenuItem { Header = Strings.Tray_Settings };
         settingsItem.Click += (_, _) => ShowSettings();
 
-        var logsItem = new MenuItem { Header = "Open logs folder" };
+        var diagnosticsItem = new MenuItem { Header = Strings.Tray_Diagnostics };
+        diagnosticsItem.Click += (_, _) => ShowDiagnostics();
+
+        var logsItem = new MenuItem { Header = Strings.Tray_OpenLogs };
         logsItem.Click += (_, _) => OpenLogsFolder();
 
-        _showKeyActivityItem = new MenuItem { Header = "Show key activity", IsCheckable = true };
+        var dummyItem = new MenuItem { Header = Strings.Tray_ShowDummySuggestion };
+        dummyItem.Click += (_, _) =>
+        {
+            _logger.LogInformation("Tray: show dummy suggestion");
+            _suggestionOverlay.ShowDummy();
+        };
+
+        _autoDummyItem = new MenuItem
+        {
+            Header = Strings.Tray_AutoDummyOnPause,
+            IsCheckable = true,
+            IsChecked = settingsStore.Current.Suggestions.DebugDummyOnPause
+        };
+        _autoDummyItem.Click += OnAutoDummyClicked;
+
+        _showKeyActivityItem = new MenuItem { Header = Strings.Tray_ShowKeyActivity, IsCheckable = true };
         _showKeyActivityItem.Click += OnShowKeyActivityClicked;
 
-        _showCaretMarkerItem = new MenuItem { Header = "Show caret marker", IsCheckable = true };
+        _showCaretMarkerItem = new MenuItem { Header = Strings.Tray_ShowCaretMarker, IsCheckable = true };
         _showCaretMarkerItem.Click += OnShowCaretMarkerClicked;
 
-        var exitItem = new MenuItem { Header = "Exit" };
+        var exitItem = new MenuItem { Header = Strings.Tray_Exit };
         exitItem.Click += (_, _) => ExitApplication();
 
-        var menu = new ContextMenu();
+        var menu = new ContextMenu
+        {
+            FlowDirection = _uiLanguage.CurrentFlowDirection
+        };
         menu.Items.Add(_pauseResumeItem);
         menu.Items.Add(settingsItem);
+        menu.Items.Add(diagnosticsItem);
         menu.Items.Add(logsItem);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(dummyItem);
+        menu.Items.Add(_autoDummyItem);
         menu.Items.Add(_showKeyActivityItem);
         menu.Items.Add(_showCaretMarkerItem);
         menu.Items.Add(new Separator());
@@ -135,9 +174,27 @@ public sealed class TrayIconHost : IDisposable
 
         var viewModel = new SettingsWindowViewModel(_settingsStore, _paths, _logger);
         _settingsWindow = new SettingsWindow(viewModel);
+        _settingsWindow.FlowDirection = _uiLanguage.CurrentFlowDirection;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
         _settingsWindow.Activate();
+    }
+
+    public void ShowDiagnostics()
+    {
+        if (_diagnosticsWindow is { IsLoaded: true })
+        {
+            _diagnosticsWindow.Activate();
+            return;
+        }
+
+        var viewModel = new DiagnosticsViewModel(_diagnostics);
+        _diagnosticsWindow = new DiagnosticsWindow(viewModel);
+        _diagnosticsWindow.FlowDirection = _uiLanguage.CurrentFlowDirection;
+        _diagnosticsWindow.Closed += (_, _) => _diagnosticsWindow = null;
+        _diagnosticsWindow.Show();
+        _diagnosticsWindow.Activate();
+        _logger.LogInformation("Diagnostics window opened");
     }
 
     public void Dispose()
@@ -153,6 +210,7 @@ public sealed class TrayIconHost : IDisposable
         _typingActivity.TypingResumed -= OnTypingResumed;
         _trayIcon.Dispose();
         _settingsWindow?.Close();
+        _diagnosticsWindow?.Close();
     }
 
     private void OnSettingsChanged(object? sender, AppSettings settings)
@@ -160,8 +218,10 @@ public sealed class TrayIconHost : IDisposable
         Application.Current.Dispatcher.Invoke(() =>
         {
             _pauseResumeItem.Header = settings.Suggestions.Enabled
-                ? "Pause suggestions"
-                : "Enable suggestions";
+                ? Strings.Tray_PauseSuggestions
+                : Strings.Tray_EnableSuggestions;
+            _autoDummyItem.IsChecked = settings.Suggestions.DebugDummyOnPause;
+            _suggestionOverlay.AutoDummyOnPause = settings.Suggestions.DebugDummyOnPause;
         });
     }
 
@@ -170,6 +230,24 @@ public sealed class TrayIconHost : IDisposable
         var enabled = _showCaretMarkerItem.IsChecked;
         _caretMarker.SetEnabled(enabled);
         _logger.LogInformation("Caret marker debug {State}", enabled ? "on" : "off");
+    }
+
+    private async void OnAutoDummyClicked(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var enabled = _autoDummyItem.IsChecked;
+            _suggestionOverlay.AutoDummyOnPause = enabled;
+            var settings = _settingsStore.Current;
+            settings.Suggestions.DebugDummyOnPause = enabled;
+            await _settingsStore.SaveAsync(settings).ConfigureAwait(true);
+            _logger.LogInformation("Auto dummy on pause {State}", enabled ? "on" : "off");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to toggle auto dummy");
+            _diagnostics.RecordError("auto-dummy toggle failed");
+        }
     }
 
     private void OnShowKeyActivityClicked(object sender, RoutedEventArgs e)
@@ -193,7 +271,6 @@ public sealed class TrayIconHost : IDisposable
             return;
         }
 
-        // Status only — never log or display virtual keys / text.
         _logger.LogInformation("Typing activity: paused");
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
@@ -235,6 +312,7 @@ public sealed class TrayIconHost : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to toggle suggestions");
+            _diagnostics.RecordError("suggestions toggle failed");
         }
     }
 
