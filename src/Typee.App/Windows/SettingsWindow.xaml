@@ -7,6 +7,7 @@
         MinHeight="560"
         MinWidth="640"
         WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/typee.ico"
         Background="#FFF7F8FA">
   <!--
     Callers: TrayIconHost.ShowSettings creates SettingsWindow.

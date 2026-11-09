@@ -8,6 +8,7 @@
         MinWidth="480"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
+        Icon="pack://application:,,,/Assets/typee.ico"
         Background="#FFF7F8FA">
   <DockPanel Margin="24">
     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">

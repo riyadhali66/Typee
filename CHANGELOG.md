@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent handoff section in `docs/PROGRESS.md`.
 
 ### Added
+- Brand logo pack: app/tray icons (theme + paused), window icons, `docs/brand/` (SVG, GitHub social, README header).
 - Phase 4: suggestion overlay (no-activate), Diagnostics window, EN/AR `.resx` scaffold.
 - Phase 5: SQLite `typee.db` migrations, phrase trie, Privacy wipe, caret method memory.
 - Phase 6: Harper LSP (`docs/HARPER_NOTES.md`, Job Object supervisor, fallback checker).

@@ -14,6 +14,7 @@
     <Product>Typee</Product>
     <Company>Typee</Company>
     <Description>Typee – typing assistant</Description>
+    <ApplicationIcon>Assets\typee.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +36,12 @@
 
   <ItemGroup>
     <None Include="..\..\settings.example.json" Link="settings.example.json" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\typee.ico" />
+    <Resource Include="Assets\typee-256.png" />
+    <Resource Include="Assets\typee-tray-white.ico" />
+    <Resource Include="Assets\typee-tray-black.ico" />
+    <Resource Include="Assets\typee-tray-paused.ico" />
+    <!-- Backward-compatible aliases (default = white tray for dark taskbars). -->
     <Resource Include="Assets\tray.ico" />
     <Resource Include="Assets\tray.png" />
   </ItemGroup>

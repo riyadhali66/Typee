@@ -1,5 +1,7 @@
 # Typee
 
+![Typee](docs/brand/github/readme-header-1600x400.png)
+
 **Typee – typing assistant** for Windows: an open-source tray app that offers offline grammar fixes, next-thought completions, saved phrases, and offline voice typing.
 
 > Phase 1 delivers the tray shell, settings, logging, and documentation. Later phases add caret tracking, Harper grammar, LLM completions, and Whisper voice typing.
