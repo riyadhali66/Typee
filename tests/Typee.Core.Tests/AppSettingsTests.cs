@@ -26,6 +26,7 @@ public sealed class AppSettingsTests
         Assert.Equal(500, settings.Suggestions.DebounceMs);
         Assert.Equal(12, settings.Suggestions.MinCharsBeforeSuggest);
         Assert.Equal(1500, settings.Suggestions.MaxContextChars);
+        Assert.Equal(168, settings.Suggestions.CompletionCacheTtlHours);
 
         Assert.Equal("harper", settings.Grammar.Engine);
         Assert.Equal("American", settings.Grammar.Dialect);

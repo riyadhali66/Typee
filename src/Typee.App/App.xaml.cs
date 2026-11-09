@@ -106,8 +106,21 @@ public partial class App : Application
             var settingsStore = _host.Services.GetRequiredService<ISettingsStore>();
             await settingsStore.LoadAsync().ConfigureAwait(true);
 
-            _ = _host.Services.GetRequiredService<UiLanguageService>();
             _diagnosticsForErrors = _host.Services.GetRequiredService<IDiagnosticsCollector>();
+
+            try
+            {
+                await _host.Services.GetRequiredService<ITypeeDatabase>()
+                    .InitializeAsync()
+                    .ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "SQLite initialization failed — continuing without local learning store");
+                _diagnosticsForErrors.RecordError($"sqlite-init:{ex.GetType().Name}");
+            }
+
+            _ = _host.Services.GetRequiredService<UiLanguageService>();
 
             var keyboardHook = _host.Services.GetRequiredService<KeyboardHookService>();
             var loggerFactory = _host.Services.GetRequiredService<ILoggerFactory>();

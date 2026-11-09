@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 5: SQLite `typee.db` migrations + repositories (phrases, completion_cache TTL, dictionary, snippets, custom commands, recent instructions, action profile memory, endpoint acknowledgments, caret method memory); `PhraseService` prefix trie + accept-count learning; Settings **My phrases** / **My dictionary**; Privacy Clear learned / Delete all wired to DB; caret method persistence (process name + method only).
 - Phase 4: floating suggestion overlay (non-activating, DPI-aware, theme-aware, 120 ms fade); `SuggestionOverlayViewModel` Tab/Esc swallow; hide rules + prefix trim; tray dummy suggestion + Diagnostics window; EN/AR `.resx` scaffold; `uiLanguage` validation; OwnProcess skip.
 - Phase 3: `ICaretLocator` / `ITextContextReader` with UIA TextPattern + Win32 fallbacks; `ProcessInfoService` skips (blocklist, elevated, password, fullscreen); tray debug **Show caret marker**; `TextSegmenter` + layout math unit tests.
 - §9 hardening (now): crash marker + diagnostic clipboard offer; global exception handlers with tray notifications; `ServiceSupervisor` with 1s/5s/30s backoff for the keyboard hook.
-- Settings `schemaVersion` 1, migrator/validator, `settings.backup.json`, import/export/reset; Privacy tab (clear local data; DB wipe Phase 5).
+- Settings `schemaVersion` 1, migrator/validator, `settings.backup.json`, import/export/reset; Privacy tab (clear learned / delete all including typee.db).
 - `SetDefaultDllDirectories` at app startup; hook watchdog (Raw Input keyboard timestamps); system resume + `TaskbarCreated` handling.
 - Hardening & Release Readiness spec (`docs/MASTER_PROMPT.md` §9): Credential Manager keys, Velopack installer plan, Arabic/a11y, test harness (deferred).
 - Agent handoff section in `docs/PROGRESS.md`.

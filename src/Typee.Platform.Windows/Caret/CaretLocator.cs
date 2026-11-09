@@ -12,16 +12,22 @@ public sealed class CaretLocator : ICaretLocator
 {
     private readonly UiaThread _uiaThread;
     private readonly ProcessInfoService _guard;
+    private readonly ICaretMethodMemoryRepository _methodMemory;
     private readonly ILogger<CaretLocator> _logger;
+    private readonly TimeProvider _time;
 
     public CaretLocator(
         UiaThread uiaThread,
         ProcessInfoService guard,
-        ILogger<CaretLocator> logger)
+        ICaretMethodMemoryRepository methodMemory,
+        ILogger<CaretLocator> logger,
+        TimeProvider? time = null)
     {
         _uiaThread = uiaThread;
         _guard = guard;
+        _methodMemory = methodMemory;
         _logger = logger;
+        _time = time ?? TimeProvider.System;
     }
 
     public CaretLocation? TryLocate()
@@ -31,17 +37,25 @@ public sealed class CaretLocator : ICaretLocator
             return null;
         }
 
+        var processName = _guard.TryGetForegroundProcessName();
+        var preferred = processName is null ? null : _methodMemory.TryGet(processName);
+
         return _uiaThread.Invoke(automation =>
         {
-            // Resolve + privacy-check one focused element; use that instance only.
             if (_guard.TryGetSafeFocusedElement(automation, out var element) is not null)
             {
                 return null;
             }
 
-            if (TryGuiThreadInfo(out var guiRect, out var method))
+            if (preferred is { } remembered
+                && TryMethod(remembered, element, out var preferredRect))
             {
-                return BuildLocation(guiRect, method);
+                return RememberAndBuild(processName, preferredRect, remembered);
+            }
+
+            if (TryGuiThreadInfo(out var guiRect, out var guiMethod))
+            {
+                return RememberAndBuild(processName, guiRect, guiMethod);
             }
 
             if (element is null)
@@ -51,21 +65,51 @@ public sealed class CaretLocator : ICaretLocator
 
             if (TryTextPattern2Caret(element, out var tp2Rect))
             {
-                return BuildLocation(tp2Rect, CaretDetectionMethod.TextPattern2CaretRange);
+                return RememberAndBuild(processName, tp2Rect, CaretDetectionMethod.TextPattern2CaretRange);
             }
 
             if (TryTextPatternSelection(element, out var selectionRect))
             {
-                return BuildLocation(selectionRect, CaretDetectionMethod.TextPatternSelection);
+                return RememberAndBuild(processName, selectionRect, CaretDetectionMethod.TextPatternSelection);
             }
 
             if (TryFocusedBounds(element, out var boundsRect))
             {
-                return BuildLocation(boundsRect, CaretDetectionMethod.FocusedElementBounds);
+                return RememberAndBuild(processName, boundsRect, CaretDetectionMethod.FocusedElementBounds);
             }
 
             return null;
         });
+    }
+
+    private CaretLocation RememberAndBuild(string? processName, ScreenRect caretRect, CaretDetectionMethod method)
+    {
+        if (!string.IsNullOrWhiteSpace(processName))
+        {
+            try
+            {
+                _methodMemory.Upsert(processName, method, _time.GetUtcNow());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to persist caret method for process {Process}", processName);
+            }
+        }
+
+        return BuildLocation(caretRect, method);
+    }
+
+    private bool TryMethod(CaretDetectionMethod method, IUIAutomationElement? element, out ScreenRect rect)
+    {
+        rect = default;
+        return method switch
+        {
+            CaretDetectionMethod.GuiThreadInfo => TryGuiThreadInfo(out rect, out _),
+            CaretDetectionMethod.TextPattern2CaretRange => element is not null && TryTextPattern2Caret(element, out rect),
+            CaretDetectionMethod.TextPatternSelection => element is not null && TryTextPatternSelection(element, out rect),
+            CaretDetectionMethod.FocusedElementBounds => element is not null && TryFocusedBounds(element, out rect),
+            _ => false
+        };
     }
 
     private static CaretLocation BuildLocation(ScreenRect caretRect, CaretDetectionMethod method)

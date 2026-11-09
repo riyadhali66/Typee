@@ -21,6 +21,9 @@ public sealed class TrayIconHost : IDisposable
 
     private readonly ISettingsStore _settingsStore;
     private readonly IAppPaths _paths;
+    private readonly IPhraseService _phrases;
+    private readonly IUserDictionaryRepository _dictionary;
+    private readonly ITypeeDatabase _database;
     private readonly TypingActivityService _typingActivity;
     private readonly CaretMarkerService _caretMarker;
     private readonly SuggestionOverlayService _suggestionOverlay;
@@ -40,6 +43,9 @@ public sealed class TrayIconHost : IDisposable
     public TrayIconHost(
         ISettingsStore settingsStore,
         IAppPaths paths,
+        IPhraseService phrases,
+        IUserDictionaryRepository dictionary,
+        ITypeeDatabase database,
         TypingActivityService typingActivity,
         CaretMarkerService caretMarker,
         SuggestionOverlayService suggestionOverlay,
@@ -49,6 +55,9 @@ public sealed class TrayIconHost : IDisposable
     {
         _settingsStore = settingsStore;
         _paths = paths;
+        _phrases = phrases;
+        _dictionary = dictionary;
+        _database = database;
         _typingActivity = typingActivity;
         _caretMarker = caretMarker;
         _suggestionOverlay = suggestionOverlay;
@@ -172,7 +181,13 @@ public sealed class TrayIconHost : IDisposable
             return;
         }
 
-        var viewModel = new SettingsWindowViewModel(_settingsStore, _paths, _logger);
+        var viewModel = new SettingsWindowViewModel(
+            _settingsStore,
+            _paths,
+            _phrases,
+            _dictionary,
+            _database,
+            _logger);
         _settingsWindow = new SettingsWindow(viewModel);
         _settingsWindow.FlowDirection = _uiLanguage.CurrentFlowDirection;
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;

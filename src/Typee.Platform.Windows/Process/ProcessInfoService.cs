@@ -142,6 +142,13 @@ public sealed class ProcessInfoService : ITargetContextGuard
     private static bool IsBlocklisted(string processName, IReadOnlyList<string> blocked) =>
         blocked.Any(entry => string.Equals(entry, processName, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Foreground process file name (e.g. notepad.exe), or null. Never returns user text.</summary>
+    public string? TryGetForegroundProcessName()
+    {
+        var hwnd = GetForegroundWindow();
+        return hwnd == 0 ? null : TryGetProcessName(hwnd);
+    }
+
     private static string? TryGetProcessName(nint hwnd)
     {
         _ = GetWindowThreadProcessId(hwnd, out var pid);

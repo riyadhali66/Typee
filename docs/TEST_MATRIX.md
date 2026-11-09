@@ -32,3 +32,20 @@ Run with tray **Show dummy suggestion** (caret in a text field) or **Auto dummy 
 7. Second monitor + 150% DPI: overlay clamps to work area and scales DIP correctly.
 
 Status after Phase 4 code: matrix columns **Caret** / **Overlay** ready for Checkpoint B manual fill; automated TestHost still deferred.
+
+## Phase 5 automated coverage (storage)
+
+| Area | Status |
+|---|---|
+| Migrations create all tables + idempotent re-run | ✅ unit |
+| Phrase repository round-trip / case-insensitive find | ✅ unit |
+| Phrase trie match (1–5 words) + ranking | ✅ unit |
+| Accept-count (increment / insert after 3) | ✅ unit |
+| Completion cache TTL delete | ✅ unit |
+| Recent instructions keep last 10 | ✅ unit |
+| Caret method memory (process name + method only) | ✅ unit |
+| Clear learned retains snippets | ✅ unit |
+| Settings My phrases / My dictionary UI | — manual |
+| Privacy Clear / Delete all | — manual |
+
+Logs must never contain phrase/dictionary/suggestion text (IDs and counts only).

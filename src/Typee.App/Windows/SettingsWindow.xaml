@@ -74,6 +74,8 @@
             <TextBox Text="{Binding MaxContextChars, UpdateSourceTrigger=PropertyChanged}"/>
             <CheckBox Content="Level 1 grammar enabled" IsChecked="{Binding Level1GrammarEnabled}"/>
             <CheckBox Content="Level 2 completion enabled" IsChecked="{Binding Level2CompletionEnabled}"/>
+            <TextBlock Text="Completion cache TTL (hours)" Style="{StaticResource FieldLabel}"/>
+            <TextBox Text="{Binding CompletionCacheTtlHours, UpdateSourceTrigger=PropertyChanged}"/>
 
             <TextBlock Text="Grammar (Harper)" Style="{StaticResource SectionHeader}"/>
             <TextBlock Text="Dialect" Style="{StaticResource FieldLabel}"/>
@@ -166,16 +168,58 @@
         </ScrollViewer>
       </TabItem>
 
+      <TabItem Header="My phrases">
+        <ScrollViewer Style="{StaticResource TabScroll}">
+          <StackPanel>
+            <TextBlock Text="My phrases" Style="{StaticResource SectionHeader}"/>
+            <TextBlock TextWrapping="Wrap" Foreground="#FF666666" Margin="0,0,0,8"
+                       Text="Saved phrases power fast local completions (prefix match on the last 1–5 words). Accepted suggestions are learned after 3 accepts."/>
+            <DockPanel Margin="0,0,0,8">
+              <Button DockPanel.Dock="Right" Content="Add" Width="80" Margin="8,0,0,0" Command="{Binding AddPhraseCommand}"/>
+              <TextBox Text="{Binding NewPhraseText, UpdateSourceTrigger=PropertyChanged}"/>
+            </DockPanel>
+            <ListBox ItemsSource="{Binding Phrases}" SelectedItem="{Binding SelectedPhrase}" Height="280"
+                     DisplayMemberPath="Text" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+              <Button Content="Delete" Width="90" Margin="0,0,8,0" Command="{Binding DeletePhraseCommand}"/>
+              <Button Content="Import…" Width="90" Margin="0,0,8,0" Command="{Binding ImportPhrasesCommand}"/>
+              <Button Content="Export…" Width="90" Command="{Binding ExportPhrasesCommand}"/>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="My dictionary">
+        <ScrollViewer Style="{StaticResource TabScroll}">
+          <StackPanel>
+            <TextBlock Text="My dictionary" Style="{StaticResource SectionHeader}"/>
+            <TextBlock TextWrapping="Wrap" Foreground="#FF666666" Margin="0,0,0,8"
+                       Text="Words added here are ignored by Harper grammar (wired in Phase 6)."/>
+            <DockPanel Margin="0,0,0,8">
+              <Button DockPanel.Dock="Right" Content="Add" Width="80" Margin="8,0,0,0" Command="{Binding AddDictionaryWordCommand}"/>
+              <TextBox Text="{Binding NewDictionaryWord, UpdateSourceTrigger=PropertyChanged}"/>
+            </DockPanel>
+            <ListBox ItemsSource="{Binding DictionaryWords}" SelectedItem="{Binding SelectedDictionaryWord}" Height="280"
+                     DisplayMemberPath="Word" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+              <Button Content="Delete" Width="90" Margin="0,0,8,0" Command="{Binding DeleteDictionaryWordCommand}"/>
+              <Button Content="Import…" Width="90" Margin="0,0,8,0" Command="{Binding ImportDictionaryCommand}"/>
+              <Button Content="Export…" Width="90" Command="{Binding ExportDictionaryCommand}"/>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <TabItem Header="Privacy &amp; data">
         <ScrollViewer Style="{StaticResource TabScroll}">
           <StackPanel>
             <TextBlock Text="What Typee stores locally" Style="{StaticResource SectionHeader}"/>
             <TextBlock TextWrapping="Wrap" Foreground="#FF555555" Margin="0,0,0,12"
-                       Text="settings.json and settings.backup.json (preferences only — API keys stay in environment variables), rolling logs under logs\ (counts and errors, never typed text), and crash.marker while running. SQLite learning data (Phase 5) will live in typee.db."/>
+                       Text="{Binding StorageSummary}"/>
             <Button Content="Clear learned data…" HorizontalAlignment="Left" Margin="0,0,0,8" Command="{Binding ClearLearnedDataCommand}"/>
             <Button Content="Delete all Typee data…" HorizontalAlignment="Left" Command="{Binding DeleteAllDataCommand}"/>
             <TextBlock TextWrapping="Wrap" Foreground="#FF888888" Margin="0,12,0,0"
-                       Text="These actions currently remove settings, logs, and the crash marker. Database wipe is deferred to Phase 5."/>
+                       Text="Clear learned data keeps snippets, custom commands, settings, and logs. Delete all removes the whole %LOCALAPPDATA%\Typee folder contents Typee manages (settings, database, logs, crash marker) and recreates an empty database."/>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

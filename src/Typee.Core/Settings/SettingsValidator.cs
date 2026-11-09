@@ -55,6 +55,12 @@ public static class SettingsValidator
             reset.Add("suggestions.maxContextChars");
         }
 
+        if (settings.Suggestions.CompletionCacheTtlHours is < 1 or > 8760)
+        {
+            settings.Suggestions.CompletionCacheTtlHours = defaults.Suggestions.CompletionCacheTtlHours;
+            reset.Add("suggestions.completionCacheTtlHours");
+        }
+
         if (settings.Grammar.RequestTimeoutMs is < 50 or > 10_000)
         {
             settings.Grammar.RequestTimeoutMs = defaults.Grammar.RequestTimeoutMs;
