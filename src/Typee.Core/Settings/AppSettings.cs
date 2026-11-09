@@ -101,6 +101,9 @@ public sealed class SuggestionSettings
 
     /// <summary>Debug: show a dummy suggestion on each typing pause (Phase 4 manual testing).</summary>
     public bool DebugDummyOnPause { get; set; }
+
+    /// <summary>SendInput (default) or Clipboard — how Tab accept inserts text (Phase 8).</summary>
+    public string InsertMode { get; set; } = "SendInput";
 }
 
 public sealed class GrammarSettings

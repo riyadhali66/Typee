@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Typee.Core.Abstractions;
+using Typee.Core.Insertion;
 using Typee.Core.Llm;
 using Typee.Core.Models;
 
@@ -117,6 +118,7 @@ public sealed class LlmCompletionSuggestionProvider : ISuggestionProvider
             _logger.LogWarning(ex, "Failed to write completion cache");
         }
 
+        var mode = TextInsertPlanFactory.ParseMode(context.Settings.Suggestions.InsertMode);
         return new Suggestion
         {
             HeaderKey = "Suggestion_Completion",
@@ -127,7 +129,8 @@ public sealed class LlmCompletionSuggestionProvider : ISuggestionProvider
             Kind = SuggestionKind.Completion,
             Level = SuggestionLevel.Completion,
             AnchorCaret = context.Caret?.CaretRect,
-            Monitor = context.Caret?.Monitor
+            Monitor = context.Caret?.Monitor,
+            Insert = TextInsertPlanFactory.ForAppend(context.Text, completion, context.Target, mode)
         };
     }
 

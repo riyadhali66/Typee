@@ -390,6 +390,136 @@ internal static partial class NativeMethods
         public nint HIconSm;
     }
 
+    // --- SendInput (KEYEVENTF_UNICODE) + clipboard (Phase 8) ---
+    // Callers: Insertion/SendInputUnicode.cs, Insertion/ClipboardGuardian.cs,
+    // Insertion/TextInserter.cs, Insertion/FocusSnapshotService.cs
+    public const uint InputKeyboard = 1;
+    public const uint KeyeventfKeyup = 0x0002;
+    public const uint KeyeventfUnicode = 0x0004;
+    public const uint KeyeventfExtendedkey = 0x0001;
+
+    public const int VkBack = 0x08;
+    public const int VkTab = 0x09;
+    public const int VkReturn = 0x0D;
+    public const int VkLeft = 0x25;
+    public const int VkUp = 0x26;
+    public const int VkRight = 0x27;
+    public const int VkDown = 0x28;
+    public const int VkV = 0x56;
+
+    public const uint GmemMoveable = 0x0002;
+    public const int ErrorClipboardNotOpen = 1418;
+    public const int ErrorAccessDenied = 5;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetForegroundWindow(nint hWnd);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint SetFocus(nint hWnd);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint GetFocus();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(nint hWnd);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool OpenClipboard(nint hWndNewOwner);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseClipboard();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EmptyClipboard();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint GetClipboardData(uint uFormat);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint SetClipboardData(uint uFormat, nint hMem);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial uint EnumClipboardFormats(uint format);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsClipboardFormatAvailable(uint format);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial nint GlobalAlloc(uint uFlags, nuint dwBytes);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial nint GlobalLock(nint hMem);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GlobalUnlock(nint hMem);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial nuint GlobalSize(nint hMem);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    internal static partial nint GlobalFree(nint hMem);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Input
+    {
+        public uint Type;
+        public InputUnion Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    internal struct InputUnion
+    {
+        [FieldOffset(0)]
+        public MouseInput Mi;
+        [FieldOffset(0)]
+        public KeybdInput Ki;
+        [FieldOffset(0)]
+        public HardwareInput Hi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseInput
+    {
+        public int Dx;
+        public int Dy;
+        public uint MouseData;
+        public uint DwFlags;
+        public uint Time;
+        public nuint DwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct KeybdInput
+    {
+        public ushort WVk;
+        public ushort WScan;
+        public uint DwFlags;
+        public uint Time;
+        public nuint DwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct HardwareInput
+    {
+        public uint UMsg;
+        public ushort WParamL;
+        public ushort WParamH;
+    }
+
     // --- Windows Credential Manager (advapi32) — API keys only, never logged ---
     public const uint CredTypeGeneric = 1;
     public const uint CredPersistLocalMachine = 2;

@@ -18,7 +18,7 @@ namespace Typee.App.Services;
 
 /// <summary>
 /// Owns the suggestion overlay window lifecycle: positioning, hide rules, suggestion pipeline,
-/// and fullscreen pause. Never inserts text (Phase 8) and never logs suggestion content.
+/// Tab accept → <see cref="ITextInserter"/>, and fullscreen pause. Never logs suggestion content.
 /// </summary>
 public sealed class SuggestionOverlayService : IDisposable
 {
@@ -27,6 +27,7 @@ public sealed class SuggestionOverlayService : IDisposable
 
     private readonly SuggestionOverlayViewModel _viewModel;
     private readonly SuggestionPipelineService _pipeline;
+    private readonly ITextInserter _textInserter;
     private readonly ICaretLocator _caretLocator;
     private readonly IKeyboardEvents _keyboardEvents;
     private readonly TypingActivityService _typingActivity;
@@ -49,6 +50,7 @@ public sealed class SuggestionOverlayService : IDisposable
     public SuggestionOverlayService(
         SuggestionOverlayViewModel viewModel,
         SuggestionPipelineService pipeline,
+        ITextInserter textInserter,
         ICaretLocator caretLocator,
         IKeyboardEvents keyboardEvents,
         TypingActivityService typingActivity,
@@ -61,6 +63,7 @@ public sealed class SuggestionOverlayService : IDisposable
     {
         _viewModel = viewModel;
         _pipeline = pipeline;
+        _textInserter = textInserter;
         _caretLocator = caretLocator;
         _keyboardEvents = keyboardEvents;
         _typingActivity = typingActivity;
@@ -77,6 +80,7 @@ public sealed class SuggestionOverlayService : IDisposable
         _typingActivity.TypingResumed += OnTypingResumed;
         _focusMonitor.FocusChanged += OnFocusChanged;
         _settingsStore.SettingsChanged += OnSettingsChanged;
+        _viewModel.Accepted += OnSuggestionAccepted;
         _autoDummyOnPause = _settingsStore.Current.Suggestions.DebugDummyOnPause;
     }
 
@@ -365,6 +369,33 @@ public sealed class SuggestionOverlayService : IDisposable
         // Hide/trim is driven by OnKeyEvent (first key of the resume).
     }
 
+    private void OnSuggestionAccepted(object? sender, SuggestionAcceptedEventArgs e)
+    {
+        // Off the UI / hook path — insertion may take hundreds of ms (clipboard restore).
+        var plan = e.Suggestion.Insert;
+        var insertText = e.InsertText;
+        var kind = e.Suggestion.Kind;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (plan is null || string.IsNullOrEmpty(insertText))
+                {
+                    _logger.LogInformation("Accept ignored (no insert plan, kind={Kind})", kind);
+                    return;
+                }
+
+                var ok = await _textInserter.ApplyPlanAsync(plan, insertText).ConfigureAwait(false);
+                _logger.LogInformation("Accept insert completed ok={Ok} kind={Kind}", ok, kind);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Accept insert failed kind={Kind}", kind);
+                _diagnostics.RecordError($"insert:{ex.GetType().Name}");
+            }
+        });
+    }
+
     private void OnFocusChanged(object? sender, EventArgs e)
     {
         Interlocked.Increment(ref _pipelineEpoch);
@@ -422,6 +453,7 @@ public sealed class SuggestionOverlayService : IDisposable
         _typingActivity.TypingResumed -= OnTypingResumed;
         _focusMonitor.FocusChanged -= OnFocusChanged;
         _settingsStore.SettingsChanged -= OnSettingsChanged;
+        _viewModel.Accepted -= OnSuggestionAccepted;
 
         _dispatcher.Invoke(() =>
         {

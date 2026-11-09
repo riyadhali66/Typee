@@ -8,9 +8,9 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 
 | Field | Value |
 |---|---|
-| Current branch | `phase/7-suggestion-pipeline` |
-| Last completed | Phase 7 suggestion pipeline + LLM + consent + CredMan |
-| Next task | Merge Phase 7 → main; then Phase 8 text insertion |
+| Current branch | `phase/8-text-insertion` |
+| Last completed | Phase 8 text insertion + focus snapshot + clipboard restore |
+| Next task | Checkpoint B manual matrix (Notepad/Chrome/Word/VS Code insert); then Phase 8A |
 | Half-done | None |
 | Uncommitted risks | `harper-ls.exe` is gitignored — CI/local must run `tools/fetch-harper.ps1` |
 | Updated | 2026-11-09 (Cursor) |
@@ -26,8 +26,8 @@ Source of truth: `docs/MASTER_PROMPT.md` (build spec), `docs/FEATURES_V2.md` (Ph
 | 4 — Suggestion overlay | [x] merged to main | 1e6e4cc |
 | 5 — SQLite storage (all tables incl. 8E/8F) | [x] merged to main | 25b01d0 |
 | 6 — Harper grammar | [x] merged to main | b0929fc |
-| 7 — Pipeline + LLM + consent | [x] code done | (this branch) |
-| 8 — Text insertion + focus snapshot | [ ] | |
+| 7 — Pipeline + LLM + consent | [x] merged to main | 3879fa5 / bd8bf98 |
+| 8 — Text insertion + focus snapshot | [x] code done | (this branch) |
 | 8A — Typee button + Action Menu | [ ] | |
 | 8B — Smart Lists | [ ] | |
 | 8C — Command Bar | [ ] | |
@@ -139,7 +139,7 @@ Tasks:
 - [ ] Display-change → refresh monitor/DPI cache (overlays later)
 - [ ] `tests/Typee.TestHost` + `docs/TEST_MATRIX.md`
 - [x] Per-process caret method memory in `typee.db` (process names only) — Phase 5
-- [ ] Clipboard full-format preserve/restore (with Phase 8 inserter)
+- [x] Clipboard full-format preserve/restore (with Phase 8 inserter)
 
 ### Phase 4
 - [x] Diagnostics window (tray → Diagnostics); never show user text
@@ -286,14 +286,25 @@ Built: `SuggestionPipelineService` + `SuggestionRouter` + `ISuggestionProvider` 
 
 - [!] Live Ollama / remote HTTPS soak left for manual Checkpoint B
 - [!] CredMan interop compiled + unit-covered via `MemoryApiKeyStore` + resolver; interactive Save/Clear/Test on a developer machine still recommended
-- [!] Text insert on Tab still Phase 8 (accept currently dismisses only)
+- [x] Text insert on Tab — completed in Phase 8
 
-## Phase 8 — Text insertion + focus snapshot — TODO
+## Phase 8 — Text insertion + focus snapshot — DONE
 
-- [ ] ITextInserter: SendInput KEYEVENTF_UNICODE batched; clipboard paste w/ save-restore after 300 ms
-- [ ] Grammar fix: select span (UIA Select preferred, Shift+arrows fallback) → insert → restore caret
-- [ ] Pre-insert verification (foreground + element + span text unchanged, else abort silently)
-- [ ] IFocusSnapshotService (window/element/selection capture + restore); tests for pure parts
+Built: `ITextInserter` / `IFocusSnapshotService` in Core; Platform `TextInserter` (SendInput `KEYEVENTF_UNICODE` batched via `UnicodeInputBatcher`, clipboard paste with full-format `ClipboardGuardian` save + restore after 300 ms — GDI formats skipped; on restore failure empty clipboard + warn, never leave Typee text silently); grammar replace = UIA `TrySelect` preferred + Shift+arrows fallback, then insert + caret restore; pre-insert verification (foreground hwnd + UIA RuntimeId + span/context text) via pure `InsertVerification` — abort silently on mismatch; `Suggestion.Insert` (`TextInsertPlan`) attached by providers; Tab/Alt+1/2/3 on overlay → `ApplyPlanAsync` off hook/UI thread; `Suggestions.InsertMode` (`SendInput`|`Clipboard`); unit tests for batching, verification, clipboard restore decisions, document span mapping.
+
+### Phase 8 deferred / notes
+
+- [!] Live insert gate (Notepad, Chrome, Word, VS Code, Arabic/emoji) deferred to Checkpoint B
+- [!] GDI clipboard formats (bitmap/metafile/palette) not duplicated — text/HGLOBAL formats restored; counted in restore decision logs (no contents)
+- [!] Clipboard restore always runs after 300 ms under insert lock — a user Copy during that window can be overwritten (documented tradeoff vs leaving Typee text)
+- [!] Dummy tray suggestion has no `Insert` plan (accept dismisses only) — intentional
+- [!] Phrase `RecordAcceptAsync` still not wired from accept (Phase 5 learning note)
+- [!] `IFocusSnapshotService.TryRestore` may return true after window-only restore when caret/selection UIA fails (8C should treat carefully)
+
+- [x] ITextInserter: SendInput KEYEVENTF_UNICODE batched; clipboard paste w/ save-restore after 300 ms
+- [x] Grammar fix: select span (UIA Select preferred, Shift+arrows fallback) → insert → restore caret
+- [x] Pre-insert verification (foreground + element + span text unchanged, else abort silently)
+- [x] IFocusSnapshotService (window/element/selection capture + restore); tests for pure parts
 
 ## Phase 8A — Typee button + Action Menu — TODO
 

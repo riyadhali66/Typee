@@ -6,17 +6,17 @@ Legend: ✅ pass · ⚠️ partial / flaky · ❌ fail · — not tested · n/a 
 
 | App | Caret | Overlay | Context | Grammar | Completion | Insert | Lists | Command bar | Send-to-AI | Snippets | Voice |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Notepad | — | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a |
-| Word | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Outlook | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Chrome (textarea) | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Edge | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Firefox | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| VS Code | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| WhatsApp desktop | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Telegram desktop | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Teams | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Slack | — | — | — | — | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Notepad | — | — | — | — | — | — | n/a | n/a | n/a | n/a | n/a |
+| Word | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Outlook | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Chrome (textarea) | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Edge | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Firefox | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| VS Code | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| WhatsApp desktop | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Telegram desktop | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Teams | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
+| Slack | — | — | — | — | n/a | — | n/a | n/a | n/a | n/a | n/a |
 | TestHost | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
 
 ## Phase 4 manual checklist (overlay)
@@ -24,7 +24,7 @@ Legend: ✅ pass · ⚠️ partial / flaky · ❌ fail · — not tested · n/a 
 Run with tray **Show dummy suggestion** (caret in a text field) or **Auto dummy on pause**.
 
 1. Overlay appears below caret (above if no room); never steals focus — host keeps typing focus.
-2. Esc dismisses; Tab dismisses (accept path; no insert until Phase 8).
+2. Esc dismisses; Tab accepts and inserts when the suggestion has an insert plan (Phase 8).
 3. Outside click / focus change / caret move hides overlay.
 4. `pauseInFullscreen=true` + fullscreen presentation/game → overlay hidden/skipped.
 5. Password / elevated / blocklisted / Typee own windows → no overlay.
@@ -79,4 +79,18 @@ Grammar column in the matrix is ready for Checkpoint B manual fill once Phase 7 
 | CredMan Save/Clear/Test in Settings | — manual |
 | Ollama on → completion ~1–2 s; typing cancels; Ollama off → grammar/phrases work | — manual |
 
-Completion column is ready for Checkpoint B manual fill (pipeline wired; insert still Phase 8).
+Completion column is ready for Checkpoint B manual fill (pipeline wired).
+
+## Phase 8 automated coverage (insertion)
+
+| Area | Status |
+|---|---|
+| UNICODE batching (Arabic, emoji surrogates, no pair split) | ✅ unit |
+| Pre-insert verification decisions (focus / span / context) | ✅ unit |
+| Clipboard restore policy (full/partial/clear/fail) + format catalog | ✅ unit |
+| Document span map + grammar replacement extract + plan factory | ✅ unit |
+| Tab/Alt+n → ITextInserter in Notepad / Chrome / Word / VS Code (EN + Arabic/emoji) | — manual Checkpoint B |
+| Clipboard paste path + 300 ms full restore (no Typee text left) | — manual |
+| Focus snapshot restore (for upcoming 8C) | — manual |
+
+Insert column is ready for Checkpoint B manual fill.
